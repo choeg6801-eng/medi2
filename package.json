@@ -1,0 +1,14 @@
+{
+  "name": "aurelis-trade-console",
+  "version": "1.0.0",
+  "private": true,
+  "description": "의료기기 수출입 업무 포털 (환율·뉴스 실시간 연동)",
+  "type": "module",
+  "scripts": {
+    "start": "node local-server.js",
+    "dev": "node --watch local-server.js"
+  },
+  "engines": {
+    "node": "22.x"
+  }
+}
