@@ -28,12 +28,28 @@ const C = {
 };
 const BY3 = Object.fromEntries(Object.entries(C).map(([k, v]) => [v[1], k]));
 
-async function call(params) {
+// 무료 공개 주소는 짧은 시간에 연속 호출하면 HTTP 429(너무 많은 요청)로 막습니다.
+// 그래서 호출 사이에 간격을 두고, 429가 오면 잠시 기다렸다가 다시 시도합니다.
+let chain = Promise.resolve();
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function call(params) {
+  const run = chain.then(() => callOnce(params));
+  chain = run.catch(() => {}).then(() => sleep(1200));
+  return run;
+}
+async function callOnce(params, tries = 0) {
   const key = KEY();
   const qs = new URLSearchParams({ ...params, partner2Code: '0', customsCode: 'C00', motCode: '0', includeDesc: 'true' });
   const url = (key ? FULL : PREVIEW) + '?' + qs;
-  const r = await fetchWithTimeout(url, key ? { headers: { 'Ocp-Apim-Subscription-Key': key } } : {}, 20000);
-  if (!r.ok) throw new Error('Comtrade HTTP ' + r.status);
+  let r = await fetchWithTimeout(url, key ? { headers: { 'Ocp-Apim-Subscription-Key': key } } : {}, 20000);
+  // 키가 잘못됐거나 아직 승인 전이면(401·403) 키 없이 쓰는 공개 주소로 자동 전환합니다.
+  if (key && (r.status === 401 || r.status === 403)) r = await fetchWithTimeout(PREVIEW + '?' + qs, {}, 20000);
+  if (r.status === 429 && tries < 3) {
+    const ra = Number(r.headers.get('retry-after')) || 0;
+    await sleep(Math.min(8000, Math.max(ra * 1000, 2500 * (tries + 1))));
+    return callOnce(params, tries + 1);
+  }
+  if (!r.ok) throw new Error('Comtrade HTTP ' + r.status + (r.status === 429 ? ' (요청 한도 초과 · 잠시 후 자동 재시도됩니다)' : ''));
   const j = await r.json();
   return Array.isArray(j.data) ? j.data : [];
 }
@@ -43,7 +59,7 @@ const val = row => Number(row.primaryValue ?? row.fobvalue ?? row.cifvalue) || 0
 /** 한국 수출: 최신 연도부터 거꾸로 내려가며 자료가 있는 첫 해를 씁니다. */
 async function exportRank(hs) {
   const now = new Date().getFullYear();
-  for (let y = now - 2; y >= now - 4; y--) {
+  for (let y = now - 1; y >= now - 4; y--) {
     const rows = await call({ reporterCode: '410', period: String(y), cmdCode: hs.join(','), flowCode: 'X' });
     const by = {};
     let total = 0;
@@ -64,17 +80,30 @@ async function exportRank(hs) {
 async function importDemand(hs, reporters) {
   const now = new Date().getFullYear();
   const codes = reporters.map(c => C[c][0]);
-  for (let y = now - 2; y >= now - 4; y--) {
-    const rows = await call({ reporterCode: codes.join(','), period: `${y},${y - 1}`, cmdCode: hs.join(','), flowCode: 'M', partnerCode: '0' });
-    const agg = {};
-    for (const r of rows) {
-      const c = BY3[r.reporterISO];
-      if (!c) continue;
-      const a = agg[c] || (agg[c] = {});
-      a[r.period] = (a[r.period] || 0) + val(r);
-    }
-    const have = Object.keys(agg).filter(c => agg[c][y] > 0).length;
-    if (have >= Math.max(3, Math.floor(reporters.length / 2))) {
+  const years = [now - 1, now - 2, now - 3];
+  // 한 번에 보내는 나라 수가 많으면 UN Comtrade가 요청을 거절할 수 있어 5개국씩 나눠 조회합니다.
+  // 최근 3개 연도를 한꺼번에 받아, 나라 절반 이상이 보고한 가장 최신 연도를 씁니다(나머지 나라는 직전 연도 값).
+  const rows = [];
+  let lastErr = null;
+  for (let i = 0; i < codes.length; i += 5) {
+    try { rows.push(...await call({ reporterCode: codes.slice(i, i + 5).join(','), period: years.join(','), cmdCode: hs.join(','), flowCode: 'M', partnerCode: '0' })); }
+    catch (e) { lastErr = e; }
+  }
+  if (!rows.length && lastErr) throw lastErr;
+  const agg = {};
+  for (const r of rows) {
+    const c = BY3[r.reporterISO];
+    if (!c) continue;
+    const a = agg[c] || (agg[c] = {});
+    a[r.period] = (a[r.period] || 0) + val(r);
+  }
+  // 연도별로 몇 개 나라가 보고했는지 함께 돌려줍니다(화면에 표시).
+  const cov = {};
+  for (const y of years) cov[y] = Object.keys(agg).filter(c => agg[c][y] > 0).length;
+  for (const y of years) {
+    const have = cov[y];
+    // 보고한 나라가 전체의 3분의 1 이상이면 그 해를 대표 연도로 씁니다(나머지 나라는 직전 연도 값).
+    if (have >= Math.max(3, Math.floor(reporters.length / 3))) {
       const out = {};
       for (const [c, a] of Object.entries(agg)) {
         const cur = a[y] > 0 ? a[y] : (a[y - 1] > 0 ? a[y - 1] : 0);
@@ -83,7 +112,7 @@ async function importDemand(hs, reporters) {
         const g = a[y] > 0 && a[y - 1] > 0 ? +(((a[y] / a[y - 1]) - 1) * 100).toFixed(1) : null;
         out[c] = { v: Math.round(cur), y: yr, g };
       }
-      return { year: y, rows: out };
+      return { year: y, rows: out, cov, n: reporters.length };
     }
   }
   return null;

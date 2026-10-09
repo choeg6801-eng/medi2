@@ -690,6 +690,36 @@ ol.steps li:last-child{border-bottom:0}
 @media (max-width:980px){.hero .hero-slide,.hero .hero-slide.t-dark,.hero .hero-slide.t-sky,.hero .hero-slide.t-mint{grid-template-columns:1fr;padding:30px 26px 74px;gap:18px;min-height:0}.hero .hero-vis{order:2;justify-content:flex-start}.hero .hv{max-width:460px}.hero .hero-dots{left:26px}}
 @media (max-width:560px){.hero .hero-vis{display:none}.hero .hero-txt h2{font-size:27px}}
 @media (prefers-reduced-motion:reduce){.hv-arc{animation:none;stroke-dashoffset:0}}
+
+/* ── 홈 배너 v3 (밝은 톤) ── */
+.hero{--ink:#0C1F36;--ha:#2F6FED;--hb:#12B5A6;--hadk:#1B4FC4;--hw:#E5533F;--hbg1:#F5F8FC;--hbg2:#E7EEF8;box-shadow:0 14px 34px -24px rgba(12,31,54,.35);border:1px solid rgba(12,31,54,.08)}
+.hero .hero-slide,.hero .hero-slide.t-dark,.hero .hero-slide.t-sky,.hero .hero-slide.t-mint{color:var(--ink);
+  background:linear-gradient(120deg,var(--hbg1),var(--hbg2));grid-template-columns:minmax(0,.95fr) minmax(0,1.15fr);gap:34px;min-height:380px;padding:46px 52px 78px}
+.hero .hero-slide::before{content:"";position:absolute;inset:0;pointer-events:none;-webkit-mask-image:none;mask-image:none;background-image:repeating-linear-gradient(90deg,rgba(12,31,54,.26) 0 1px,transparent 1px 10px),repeating-linear-gradient(90deg,rgba(12,31,54,.5) 0 1px,transparent 1px 50px);background-size:100% 6px,100% 13px;background-repeat:no-repeat;background-position:0 0,0 0}
+.hero .hero-eye{display:inline-flex;align-items:center;gap:8px;margin:0 0 16px;padding:5px 12px 5px 10px;border-radius:999px;background:rgba(255,255,255,.75);border:1px solid rgba(12,31,54,.1);font-size:13px;font-weight:700;color:var(--hadk)}
+.hero .hero-eye::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--ha)}
+.hero .hero-txt h2{color:var(--ink);font-size:clamp(30px,3.2vw,44px);line-height:1.18;font-weight:800;letter-spacing:-.05em}
+.hero .hero-txt p{color:rgba(12,31,54,.68);font-size:15.5px;line-height:1.72;max-width:42ch}
+.hero .hero-slide .hbtn.pri{background:var(--ink);color:#fff;border-color:var(--ink);box-shadow:0 6px 14px -8px rgba(12,31,54,.6)}
+.hero .hbtn.pri:hover{background:var(--hadk);border-color:var(--hadk)}
+.hero .hero-slide .hbtn.ghost{background:rgba(255,255,255,.6);color:var(--ink);border:1px solid rgba(12,31,54,.2)}
+.hero .hbtn.ghost:hover{background:#fff}
+.hero .hero-vis{align-self:center;justify-content:center;background:#fff;border:1px solid rgba(12,31,54,.1);border-radius:16px;padding:22px 26px 16px;box-shadow:0 18px 36px -26px rgba(12,31,54,.4);border-top:3px solid var(--ha)}
+.hero .hv{max-width:100%}
+.hero .hv text{fill:var(--ink);font-size:15px}.hero .hv .hv-m{fill:rgba(12,31,54,.56)}.hero .hv .hv-s{font-size:14px}.hero .hv .hv-xs{font-size:12.5px}
+.hero .hv text.hv-big{font-size:60px;font-weight:300;letter-spacing:-.04em}.hero .hv text.hv-rank{font-size:60px;font-weight:200}.hero .hv text.hv-l{font-size:22px;font-weight:750}.hero .hv text.hv-num.hv-big{font-weight:300}
+.hero .hv .hv-b6{fill:var(--ink)}.hero .hv .hv-a{fill:var(--hadk)}.hero .hv .hv-rank{fill:rgba(12,31,54,.16)}.hero .hv .hv-big{font-weight:400}
+.hero .hv-g{stroke:rgba(12,31,54,.09)}.hero .hv-eq{stroke:rgba(12,31,54,.2)}
+.hero .hv-arc{stroke:var(--ha);stroke-width:1.9;stroke-opacity:.9}
+.hero .hv-n{fill:var(--ha)}.hero .hv-seoul{fill:var(--ink)}.hero .hv-seoul-r{stroke:var(--ink);stroke-opacity:.45}
+.hero .hv-bar{fill:var(--ha)}.hero .hv-bar2{fill:rgba(12,31,54,.15)}.hero .hv-trk{fill:rgba(12,31,54,.08)}
+.hero .hv-c1{fill:var(--ha)}.hero .hv-c2{fill:var(--hb)}.hero .hv-c3{fill:#E8A93A}.hero .hv-c4{fill:rgba(12,31,54,.25)}
+.hero .hv-band{fill:var(--ha);fill-opacity:.15}.hero .hv-line{stroke:var(--ink);stroke-width:2.2}
+.hero .hc-btn{border:1px solid rgba(12,31,54,.22);color:var(--ink);background:rgba(255,255,255,.7)}
+.hero .hc-btn:hover{background:#fff}
+.hero .hc-num{color:rgba(12,31,54,.55)}.hero .hc-num b{color:var(--ink)}
+.hero .hero-dots button{background:rgba(12,31,54,.16)}.hero .hero-dots button[aria-current]{background:var(--hadk)}
+@media (max-width:980px){.hero .hero-slide,.hero .hero-slide.t-dark,.hero .hero-slide.t-sky,.hero .hero-slide.t-mint{grid-template-columns:1fr;padding:30px 24px 74px;gap:20px;min-height:0}.hero .hero-vis{padding:16px}}
 </style>
 </head>
 <body>
@@ -1202,8 +1232,10 @@ async function loadTrade(onUpdate){
   (TRADE.cbs=TRADE.cbs||[]).push(onUpdate);if(TRADE.busy)return;TRADE.busy=true;
   const fire=()=>TRADE.cbs.forEach(f=>{try{f()}catch(e){}});
   try{
-  for(const k of keys){const d=await loadLive('trade?kind=export&hs='+k);if(d&&d.rows){TRADE.exp[k]=d;fire()}}
-  for(const k of keys){const d=await loadLive('trade?kind=import&hs='+k+'&reporters='+rep);if(d&&d.rows){TRADE.imp[k]=d;rebuildImp(k);fire()}}
+  TRADE.err='';
+  const tget=async p=>{try{const r=await fetch(`${API_BASE}/${p}`,{headers:{Accept:'application/json'}});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||('HTTP '+r.status));return j}catch(e){if(!TRADE.err)TRADE.err=String(e.message||e).replace('무역통계를 가져오지 못했습니다: ','').slice(0,70);return null}};
+  for(const k of keys){const d=await tget('trade?kind=export&hs='+k);if(d&&d.rows){TRADE.exp[k]=d;fire()}}
+  for(const k of keys){const d=await tget('trade?kind=import&hs='+k+'&reporters='+rep);if(d&&d.rows){TRADE.imp[k]=d;rebuildImp(k);fire()}}
   }finally{TRADE.busy=false;fire()}
 }
 function mkScore0(cat,c){const a=MKT_ATTR[c];if(!a)return null;const [size,growth,local,reg,fta]=a;
@@ -1887,7 +1919,7 @@ function freshBoard(root){
     const A=[
      ['환율','자동','영업일 하루 1회',(LIVE.fx&&FX_SRC)?pill('ok','연결됨 · '+esc(FX_SRC.date||'')):live(false),'수출입은행 키(Vercel 환경변수) · 키가 없으면 ExchangeRate-API로 자동 전환'],
      ['뉴스','자동','30분 캐시 · 사이트를 열 때마다',live(LIVE.news,'news'),'서버가 Google 뉴스(최근 30일)를 모읍니다. 연결 전에는 저장된 최근 90일 기사를 보여 줍니다'],
-     ['무역통계 (수요 지수·수출 국가 순위·추천 순위)','자동','하루 1회 조회 · 통계는 연 단위',Object.keys(TRADE.imp).length?pill('ok','연결됨 · '+esc((Object.values(TRADE.imp)[0]||{}).year||'')+'년'):(TRADE.busy&&!HEALTH.trade)?pill('plain','불러오는 중… (처음에는 1분 가까이 걸릴 수 있음)'):live(false,'trade'),'UN Comtrade. 새 연도가 공개되면 순위가 저절로 바뀝니다'],
+     ['무역통계 (수요 지수·수출 국가 순위·추천 순위)','자동','하루 1회 조회 · 통계는 연 단위',Object.keys(TRADE.imp).length?pill('ok','연결됨 · '+esc((Object.values(TRADE.imp)[0]||{}).year||'')+'년'+(()=>{const d=Object.values(TRADE.imp)[0]||{},c=d.cov,y=new Date().getFullYear()-1;return c?` (${y}년 자료 ${c[y]||0}/${d.n}개국 보고)`:''})()):(TRADE.busy&&!HEALTH.trade)?pill('plain','불러오는 중… (처음에는 1분 가까이 걸릴 수 있음)'):(TRADE.err?pill('crit','실패 · '+esc(TRADE.err)):live(false,'trade')),'UN Comtrade. 새 연도가 공개되면 순위가 저절로 바뀝니다'],
      ['FDA 회수 목록','자동','회수 화면을 열 때',H('recall'),'openFDA (키 불필요)'],
      ['규제·관세·FTA 변경 소식','자동','관련 화면을 열 때',H('regwatch'),'미국 연방관보 + 뉴스. 소식이 뜨면 아래 수동 항목을 확인해 고칩니다']];
     const M=[
