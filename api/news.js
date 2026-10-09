@@ -42,6 +42,13 @@ const pick = (title, rules, fallback) => {
   return fallback;
 };
 
+/* ---------- 관련성 검사 ----------
+   검색 서비스는 검색어 단어 일부만 맞아도 기사를 돌려줍니다. (예: '수출'만 들어간 지역 소식)
+   그래서 제목·요약에 의료기기 관련 단어가 하나도 없는 기사는 버립니다. */
+const REL_KO = ['의료기기', '의료 기기', '의료기', '의료용', '의료장비', '의료 장비', '의료', '체외진단', '진단키트', '진단기기', '진단 기기', '임플란트', '식약처', '수술', '초음파', '병원', '헬스케어', '메디컬', '디지털치료', '바이오헬스', '보건산업', '리콜'];
+const REL_EN = ['medical', 'medtech', 'diagnostic', 'IVD', 'FDA', 'MDR', 'IVDR', '510(k)', 'CE mark', 'NMPA', 'PMDA', 'CDSCO', 'SFDA', 'ANVISA', 'COFEPRIS', 'implant', 'surgical', 'ultrasound', 'healthcare', 'hospital', 'UDI'];
+export const isRelevant = text => REL_KO.some(w => text.includes(w)) || REL_EN.some(w => matches(text, w));
+
 const toDate = s => {
   const d = new Date(s);
   return isNaN(d) ? '' : kstDate(d);
@@ -60,7 +67,7 @@ async function fromNaver(queries) {
       const url = it.originallink || it.link;
       let source = '';
       try { source = new URL(url).hostname.replace(/^www\.|^m\./, ''); } catch {}
-      return { title: cleanText(it.title), url, source, date: toDate(it.pubDate), lang: 'ko' };
+      return { title: cleanText(it.title), desc: cleanText(it.description), url, source, date: toDate(it.pubDate), lang: 'ko' };
     });
   }));
   return all.flat();
@@ -76,14 +83,14 @@ function parseRSS(xml, lang) {
     let title = cleanText(get('title'));
     if (source && title.endsWith(` - ${source}`)) title = title.slice(0, -(source.length + 3));
     const url = cleanText(get('link'));
-    if (title && url) items.push({ title, url, source, date: toDate(cleanText(get('pubDate'))), lang });
+    if (title && url) items.push({ title, desc: cleanText(get('description')), url, source, date: toDate(cleanText(get('pubDate'))), lang });
   }
   return items;
 }
 async function fromGoogle(queries, lang) {
   const loc = lang === 'ko' ? 'hl=ko&gl=KR&ceid=KR:ko' : 'hl=en-US&gl=US&ceid=US:en';
   const all = await Promise.all(queries.map(async q => {
-    const url = `https://news.google.com/rss/search?q=${encodeURIComponent(q + ' when:14d')}&${loc}`;
+    const url = `https://news.google.com/rss/search?q=${encodeURIComponent('"' + q + '" when:14d')}&${loc}`;
     const res = await fetchWithTimeout(url, { headers: { 'User-Agent': 'Mozilla/5.0 (AurelisTradeConsole)' } });
     if (!res.ok) throw new Error(`Google 뉴스 RSS 오류 (HTTP ${res.status})`);
     return parseRSS(await res.text(), lang).slice(0, 10);
@@ -96,6 +103,7 @@ export function mergeNews(lists, limit = 60) {
   const seen = new Set();
   const out = [];
   for (const it of lists.flat()) {
+    if (!isRelevant(`${it.title} ${it.desc || ''}`)) continue;
     const key = it.title.replace(/[^0-9a-z가-힣]/gi, '').slice(0, 40).toLowerCase();
     if (!key || seen.has(key)) continue;
     seen.add(key);

@@ -322,6 +322,7 @@ table.heat td.h{text-align:center;font-variant-numeric:tabular-nums;font-size:13
 .doc .r{text-align:right;font-variant-numeric:tabular-nums}
 .item-row{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.8fr) minmax(0,1fr) 34px;gap:8px;align-items:end}
 .item-row>:first-child{grid-column:1/-1}
+.lot-pair{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:8px}
 @media (max-width:620px){.item-row{grid-template-columns:1fr 1fr}}
 
 /* news */
@@ -347,6 +348,30 @@ pre.snip{margin:0;background:var(--sunken);border-radius:12px;padding:14px 16px;
 .ico.sm{width:14px;height:14px}
 .btn .ico{width:16px;height:16px}
 .btn.sm{padding:6px 11px;font-size:12.5px;border-radius:10px}
+.xneed{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px}
+.xn1{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:12px}
+@media(max-width:640px){.xneed{grid-template-columns:1fr}}
+.livebox{margin-top:20px}
+.heat-in{width:62px;text-align:center;background:transparent;border:1px dashed transparent;border-radius:8px;padding:5px 2px;color:inherit;font:inherit;font-weight:inherit;font-variant-numeric:tabular-nums}
+.heat-in:hover{border-color:var(--line)}
+.heat-in:focus{outline:none;border-color:var(--accent);background:var(--surface);color:var(--ink);box-shadow:0 0 0 3px var(--accent-soft)}
+.heat-in::placeholder{color:var(--muted)}
+.lb-ctl{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin:4px 0 12px}
+.lb-f{display:grid;gap:4px;font-size:12px;color:var(--ink-2)}
+.lb-f select,.lb-f input{height:36px}
+.lb-chk{display:flex;gap:6px;align-items:center;font-size:13px;height:36px}
+.btn.pri{background:var(--accent);color:#fff;border-color:var(--accent)}
+.lb-list{display:grid;gap:8px}
+.lb-item{display:grid;gap:4px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;text-decoration:none;color:var(--ink);background:var(--surface)}
+.lb-item:hover{border-color:var(--accent)}
+.lb-h{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.lb-p{font-size:13px;font-weight:600;overflow-wrap:anywhere}
+.lb-r{font-size:12.5px;color:var(--ink-2);overflow-wrap:anywhere}
+.lb-m{font-size:12px;color:var(--ink-2)}
+@media(max-width:640px){.lb-ctl>*{flex:1 1 100%}.lb-ctl .btn{width:100%}}
+.srcfoot{margin-top:20px;padding:14px 16px;border:1px dashed var(--line);border-radius:14px;font-size:12.5px;color:var(--ink-2);display:grid;gap:6px}
+.srcfoot .sf-t b{color:var(--ink)}
+.srcfoot .sf-l{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
 .btn.ghost{box-shadow:none;background:transparent}
 .btn.danger{color:var(--crit)}
 .btn.danger:hover{border-color:var(--crit);color:var(--crit);background:var(--crit-soft)}
@@ -1374,21 +1399,38 @@ def('disposal','물류 · 콜드체인','폐기 판정 시뮬레이터','온도 
 });
 
 /* 7. carriers */
-def('carriers','물류 · 콜드체인','운송 파트너 리스크','노선·운송사별 온도 이탈 발생 빈도(선적 100건당)를 비교해 가장 안전한 파트너를 고릅니다.',root=>{
-  const car=['NorthStar Air','Kestrel Cargo','Aerolink','Coldway Ocean','Tidal Reefer','Harbor Line'];
-  const L=[['ICN→LAX','항공',[2.4,4.1,3.2,null,null,null]],['ICN→SGN','항공',[3.5,1.9,4.6,null,null,null]],['ICN→CGK','항공',[4.2,2.6,3.8,null,null,null]],['ICN→GRU','항공',[6.4,7.8,5.1,null,null,null]],['PUS→HAM','해상',[null,null,null,1.6,1.1,2.4]],['PUS→JED','해상',[null,null,null,3.9,5.6,2.8]],['PUS→JEA','해상',[null,null,null,2.7,3.6,2.2]]];
-  const cells=L.flatMap(l=>l[2].map((v,i)=>({l:l[0],c:car[i],v})).filter(x=>x.v!=null)),worst=cells.reduce((a,b)=>b.v>a.v?b:a),best=cells.reduce((a,b)=>b.v<a.v?b:a),alt=cells.filter(x=>x.l===worst.l&&x.c!==worst.c).sort((a,b)=>a.v-b.v)[0],hard=L.find(l=>Math.min(...l[2].filter(v=>v!=null))>=5),wsh=SHIPMENTS.find(x=>x.carrier===worst.c&&worst.l.endsWith(x.to)&&x.stage<6);
+const CARR_CARS=['NorthStar Air','Kestrel Cargo','Aerolink','Coldway Ocean','Tidal Reefer','Harbor Line'];
+const CARR_BASE=[['ICN→LAX','항공',[2.4,4.1,3.2,null,null,null]],['ICN→SGN','항공',[3.5,1.9,4.6,null,null,null]],['ICN→CGK','항공',[4.2,2.6,3.8,null,null,null]],['ICN→GRU','항공',[6.4,7.8,5.1,null,null,null]],['PUS→HAM','해상',[null,null,null,1.6,1.1,2.4]],['PUS→JED','해상',[null,null,null,3.9,5.6,2.8]],['PUS→JEA','해상',[null,null,null,2.7,3.6,2.2]]];
+let CARR={routes:CARR_BASE.map(([r,m,v])=>({r,m,v:[...v]}))};
+def('carriers','물류 · 콜드체인','운송 파트너 리스크','노선·운송사별 온도 이탈 발생 빈도(선적 100건당)를 비교해 가장 안전한 파트너를 고릅니다. 표의 숫자는 직접 고칠 수 있습니다.',root=>{
+  const car=CARR_CARS,L=CARR.routes;
+  const val=x=>{if(x===''||x==null)return null;const n=+x;return isNaN(n)?null:Math.min(100,Math.max(0,Math.round(n*10)/10))};
+  const cells=L.flatMap(l=>l.v.map((v,i)=>({l:l.r,c:car[i],v})).filter(x=>x.v!=null));
+  const worst=cells.length>1?cells.reduce((a,b)=>b.v>a.v?b:a):null,best=cells.length?cells.reduce((a,b)=>b.v<a.v?b:a):null;
+  const alt=worst?cells.filter(x=>x.l===worst.l&&x.c!==worst.c).sort((a,b)=>a.v-b.v)[0]:null;
+  const hard=L.find(l=>{const v=l.v.filter(x=>x!=null);return v.length>=2&&Math.min(...v)>=5});
+  const wsh=worst?SHIPMENTS.find(x=>x.carrier===worst.c&&worst.l.endsWith(x.to)&&x.stage<6):null;
+  const modeOf=r=>(L.find(l=>l.r===r)||{}).m;
   root.innerHTML=head('물류 · 콜드체인','운송 파트너 리스크',CUR.desc)+`
+  <div class="callout"><b>이렇게 쓰세요</b>표의 숫자를 눌러 고치면 추천과 권고가 바로 바뀝니다. 비워 두면 그 운송사가 운항하지 않는 노선으로 봅니다. 처음 들어 있는 값은 업계 참고용 예시이며, 수정한 값은 저장됩니다.</div>
   <section class="card"><div class="card-h"><h2 class="ct">온도 이탈 히트맵 (선적 100건당, 최근 12개월)</h2><div class="legend"><span><i style="background:var(--ok-soft)"></i>3 미만</span><span><i style="background:var(--warn-soft)"></i>3–5</span><span><i style="background:var(--crit-soft)"></i>5 이상</span></div></div>
-  <div class="tbl"><table class="data heat"><thead><tr><th>노선</th>${car.map(c=>`<th style="text-align:center">${c}</th>`).join('')}<th>추천</th></tr></thead><tbody>
-  ${L.map(l=>{const vals=l[2].filter(v=>v!=null),mn=Math.min(...vals),best=car[l[2].indexOf(mn)];return `<tr><td><b>${l[0]}</b> <span class="note">${l[1]}</span></td>${l[2].map(v=>v==null?`<td class="h" style="color:var(--muted)">—</td>`:`<td class="h" style="background:var(--${v<3?'ok':v<5?'warn':'crit'}-soft);color:var(--${v<3?'ok':v<5?'warn':'crit'});${v===mn?'font-weight:700;box-shadow:inset 0 0 0 2px var(--ok)':''}">${v.toFixed(1)}</td>`).join('')}<td>${best}</td></tr>`}).join('')}
-  </tbody></table></div></section>
-  <div class="row"><section class="card c-6"><div class="card-h"><h2 class="ct">운송사 종합 이탈률</h2><span class="sub">운항 노선 평균</span></div>
-  ${hbars(car.map((c,i)=>{const v=L.map(l=>l[2][i]).filter(x=>x!=null);const a=v.reduce((x,y)=>x+y,0)/v.length;return{label:c,value:a,text:a.toFixed(1)+'건',c:a<3?'--ok':a<5?'--warn':'--crit'}}).sort((a,b)=>a.value-b.value))}</section>
+  ${L.length?`<div class="tbl"><table class="data heat" id="chm"><thead><tr><th>노선</th>${car.map(c=>`<th style="text-align:center">${c}</th>`).join('')}<th>추천</th><th></th></tr></thead><tbody>
+  ${L.map((l,ri)=>{const vals=l.v.filter(v=>v!=null),mn=vals.length?Math.min(...vals):null,bc=mn==null?'—':car[l.v.indexOf(mn)];return `<tr><td><b>${esc(l.r)}</b> <span class="note">${esc(l.m)}</span></td>${l.v.map((v,ci)=>`<td class="h" style="${v==null?'':`background:var(--${v<3?'ok':v<5?'warn':'crit'}-soft);color:var(--${v<3?'ok':v<5?'warn':'crit'});`}${v!=null&&v===mn?'font-weight:700;box-shadow:inset 0 0 0 2px var(--ok)':''}"><input class="heat-in" type="number" inputmode="decimal" step="0.1" min="0" max="100" data-r="${ri}" data-c="${ci}" value="${v==null?'':v}" placeholder="—" aria-label="${esc(l.r)} ${car[ci]} 이탈 건수"></td>`).join('')}<td>${bc}</td><td class="r"><button class="icon-btn" data-delr="${ri}" aria-label="${esc(l.r)} 노선 삭제">${ic('x')}</button></td></tr>`}).join('')}
+  </tbody></table></div>`:`<p class="note" style="margin:6px 0 12px">등록된 노선이 없습니다. 아래에서 노선을 추가하세요.</p>`}
+  <div class="form" style="margin-top:14px;align-items:end"><div class="field"><label for="crN">노선 추가</label><input id="crN" maxlength="20" placeholder="예: ICN→DXB"></div><div class="field"><label for="crM">운송 방식</label><select id="crM"><option>항공</option><option>해상</option></select></div><div class="field"><label>&nbsp;</label><button class="btn" id="crA" type="button">${ic('plus')}노선 추가</button></div></div>
+  <div style="margin-top:10px"><button class="btn sm" id="crR" type="button">예시 값으로 되돌리기</button></div></section>
+  ${cells.length?`<div class="row"><section class="card c-6"><div class="card-h"><h2 class="ct">운송사 종합 이탈률</h2><span class="sub">운항 노선 평균</span></div>
+  ${hbars(car.map((c,i)=>{const v=L.map(l=>l.v[i]).filter(x=>x!=null);if(!v.length)return null;const a=v.reduce((x,y)=>x+y,0)/v.length;return{label:c,value:a,text:a.toFixed(1)+'건',c:a<3?'--ok':a<5?'--warn':'--crit'}}).filter(Boolean).sort((a,b)=>a.value-b.value))}</section>
   <section class="card c-6 stack"><h2 class="ct">권고 사항</h2>
-  <div class="callout crit"><b>${worst.l} · ${worst.c}</b>이탈 ${worst.v.toFixed(1)}건으로 가장 높습니다.${wsh?` 진행 중인 ${wsh.id}도 이 운송사입니다.`:''} ${alt?`다음 선적부터 ${alt.c}(${alt.v.toFixed(1)}건)으로 전환을 검토하세요.`:''}</div>
-  ${hard?`<div class="callout warn"><b>${hard[0]} 전 운송사 5건 이상</b>직항이 없어 환적 공항(프랑크푸르트·두바이 등) 계류 중 이탈이 집중됩니다. 120시간 인증 수동형 냉장 박스나 능동형 컨테이너(RKN 등)를 권장합니다.</div>`:''}
-  <div class="callout ok"><b>${best.l} · ${best.c}</b>${best.v.toFixed(1)}건으로 가장 안정적입니다. 해상 리퍼 컨테이너는 온도 제어가 연속적이라 항공보다 이탈이 적은 편이지만, 항만 반입·하역 대기 구간은 따로 기록하세요.</div></section></div>`;
+  ${worst?`<div class="callout crit"><b>${esc(worst.l)} · ${worst.c}</b>이탈 ${worst.v.toFixed(1)}건으로 가장 높습니다.${wsh?` 진행 중인 ${wsh.id}도 이 운송사입니다.`:''} ${alt?`다음 선적부터 ${alt.c}(${alt.v.toFixed(1)}건)으로 전환을 검토하세요.`:'같은 노선에 비교할 다른 운송사 값이 없습니다.'}</div>`:`<div class="callout warn"><b>비교할 값이 더 필요합니다</b>두 개 이상의 숫자를 입력하면 가장 위험한 조합을 알려 드립니다.</div>`}
+  ${hard?`<div class="callout warn"><b>${esc(hard.r)} · 모든 운송사 5건 이상</b>운송사를 바꿔도 이탈이 많은 노선입니다. 직항이 없어 환적 구간에서 이탈이 생기는지 확인하고, 120시간 인증 수동형 냉장 박스나 능동형 컨테이너(RKN 등) 같은 포장 보강을 먼저 검토하세요.</div>`:''}
+  ${best?`<div class="callout ok"><b>${esc(best.l)} · ${best.c}</b>${best.v.toFixed(1)}건으로 가장 안정적입니다.${modeOf(best.l)==='해상'?' 해상 리퍼 컨테이너는 온도 제어가 연속적이라 항공보다 이탈이 적은 편이지만, 항만 반입·하역 대기 구간은 따로 기록하세요.':' 항공은 빠르지만 공항 대기·환적 구간에서 이탈이 생기기 쉬우니, 이 구간의 로거 기록을 따로 확인하세요.'}</div>`:''}</section></div>`:''}`;
+  const hm=$('#chm');
+  if(hm)hm.addEventListener('change',e=>{const i=e.target.closest('input[data-r]');if(!i)return;const l=L[+i.dataset.r];l.v[+i.dataset.c]=val(i.value);persist('carriers');route(true)});
+  if(hm)hm.addEventListener('click',e=>{const b=e.target.closest('[data-delr]');if(!b)return;if(!b.dataset.arm){b.dataset.arm='1';b.title='한 번 더 누르면 삭제';b.style.color='var(--crit)';setTimeout(()=>{b.dataset.arm='';b.style.color=''},3000);return}L.splice(+b.dataset.delr,1);persist('carriers');route(true)});
+  $('#crA').onclick=()=>{const r=$('#crN').value.trim().replace(/\s+/g,'').slice(0,20);if(!r){toast('노선 이름을 입력하세요. 예: ICN→DXB');return}if(L.some(l=>l.r.toLowerCase()===r.toLowerCase())){toast('이미 있는 노선입니다.');return}L.push({r,m:$('#crM').value,v:car.map(()=>null)});persist('carriers');route(true);toast(`${r} 노선을 추가했습니다. 운송사별 숫자를 입력하세요.`)};
+  $('#crN').onkeydown=e=>{if(e.key==='Enter')$('#crA').click()};
+  $('#crR').onclick=function(){if(!this.dataset.arm){this.dataset.arm='1';const t=this.textContent;this.textContent='한 번 더 누르면 예시 값으로 되돌립니다';setTimeout(()=>{this.dataset.arm='';this.textContent=t},3500);return}CARR.routes=CARR_BASE.map(([r,m,v])=>({r,m,v:[...v]}));persist('carriers');route(true);toast('예시 값으로 되돌렸습니다.')};
 });
 
 /* 10. docs checklist */
@@ -1467,7 +1509,7 @@ def('landed','가격 · 관세','Landed Cost 계산기','공장 출고가(EXW)�
    <div class="field"><label for="c6">수입 부가세율 (%)</label><input id="c6" type="number" value="19" step=".5"></div>
    <div class="field"><label for="c7">현지 내륙 배송 (USD)</label><input id="c7" type="number" value="700"></div>
    <div class="field"><label for="c8">수입 통관 수수료 (USD)</label><input id="c8" type="number" value="500"></div></div>
-   <p class="note" style="margin:0">보험료는 CIF 가액의 110% 기준, 관세·부가세 과세가격은 CIF 기준으로 계산합니다(EU·아시아 다수 국가 방식).</p></section>
+   <p class="note" style="margin:0">보험료는 CIF 가액의 110% 기준, 관세·부가세 과세가격은 CIF 기준으로 계산합니다(EU·아시아 다수 국가 방식). 수입 부가세는 사업자 수입자가 환급·공제받는 경우가 많아, 실제 원가를 비교할 때는 제외하기도 합니다.</p></section>
   <section class="card c-7 stack" id="lr"></section></div>`;
   function calc(){
     const q=+$('#lq').value||0,up=+$('#lp').value||0,inc=$('#li').value,g=k=>+$('#c'+k).value||0;
@@ -1510,7 +1552,7 @@ const FTA={
  PH:{fta:'한-필리핀 FTA',st:'발효',rule:'CTH 또는 RVC 40%',thr:40,m:'bd',mfn:{d:1,'3304':10},pref:{d:0}},
  SG:{fta:'한-싱가포르 FTA',st:'발효',rule:'CTH 또는 RVC 45%',thr:45,m:'bd',mfn:{d:0},pref:{d:0}},
  AU:{fta:'한-호주 FTA',st:'발효',rule:'CTSH 또는 RVC 40%',thr:40,m:'bd',mfn:{d:0,'9018':0,'3304':5},pref:{d:0}},
- SA:{fta:'한-GCC FTA (서명, 발효 전)',st:'없음',rule:'—',thr:null,m:null,mfn:{d:0,'3822':5,'9021':5,'3304':5}},
+ SA:{fta:'한-GCC FTA (협상 타결, 발효일 미정)',st:'없음',rule:'—',thr:null,m:null,mfn:{d:0,'3822':5,'9021':5,'3304':5}},
  AE:{fta:'한-UAE CEPA (2026.5 발효)',st:'발효',rule:'CTH 또는 RVC 40% (품목별 기준 확인)',thr:40,m:'bd',mfn:{d:0,'3304':5,'3822':5},pref:{d:0}},
  EG:{fta:'협정 없음',st:'없음',rule:'—',thr:null,m:null,mfn:{d:2,'9018':2,'3304':40,'3822':5}},
  ZA:{fta:'협정 없음',st:'없음',rule:'—',thr:null,m:null,mfn:{d:0,'3304':20}}};
@@ -1546,7 +1588,7 @@ def('fta','가격 · 관세','FTA 관세 시뮬레이터','수출국과 품목�
     <div class="kpis"><div class="kpi"><span class="l">일반 관세 (MFN ${rt[0]}%)</span><span class="v">${usd(mfn)}</span></div><div class="kpi"><span class="l">FTA 특혜 ${rt[1]==null?'':'('+rt[1]+'%)'}</span><span class="v">${pref==null?'—':usd(pass?pref:mfn)}</span></div><div class="kpi"><span class="l">절감액</span><span class="v ${save>0&&pass?'up':''}">${pass?usd(save):'$0'}</span><span class="d">${pass||pref==null?'':'원산지 요건 미충족 시 MFN 적용'}</span></div></div>
     ${f.m?`<div class="stack"><h2 class="ct">원산지 결정기준</h2><div class="note" style="color:var(--ink-2)">${f.rule}</div><div>${rvcTxt}</div>
     <div class="meter" style="height:12px"><span style="width:${clamp(f.m==='maxnom'?nom:f.m==='bu'?bu:f.m==='korus'?Math.max(bd,bu):bd,0,100)}%;background:var(--${pass?'ok':'crit'})"></span></div><div class="note">막대 = 계산값, 기준 ${f.thr}%</div>
-    <div class="callout ${pass?'ok':'crit'}">${pass?`원산지증명서(C/O)를 ${['US','DE','FR','IT','ES','GB','TR','CA','CL','AU'].includes(c)?'수출자 자율발급(원산지인증수출자 권장)':'상공회의소·세관 기관발급'}으로 준비하면 수입자가 특혜세율을 적용받습니다.`:(f.m==='bu'?`역내산 재료비를 ${usd(Math.max(0,fob*f.thr/100-om),2)} 이상 늘려야 기준을 충족합니다.`:`비원산지 재료비를 ${usd(Math.max(0,f.m==='korus'?vnm-fob*.55:f.m==='bd'?vnm-fob*(1-f.thr/100):vnm-fob*f.thr/100),2)} 이상 줄이거나 역내산 부품으로 대체해야 기준을 충족합니다.`)}</div></div>`
+    <div class="callout ${pass?'ok':'crit'}">${pass?`원산지증명서(C/O)를 ${['US','DE','FR','IT','ES','GB','CA','AU'].includes(c)?'수출자 자율발급(원산지인증수출자 권장)':'상공회의소·세관 기관발급이 일반적(협정별 확인 필요)'}으로 준비하면 수입자가 특혜세율을 적용받습니다.`:(f.m==='bu'?`역내산 재료비를 ${usd(Math.max(0,fob*f.thr/100-om),2)} 이상 늘려야 기준을 충족합니다.`:`비원산지 재료비를 ${usd(Math.max(0,f.m==='korus'?vnm-fob*.55:f.m==='bd'?vnm-fob*(1-f.thr/100):vnm-fob*f.thr/100),2)} 이상 줄이거나 역내산 부품으로 대체해야 기준을 충족합니다.`)}</div></div>`
     :`<div class="callout"><b>적용할 수 있는 발효 FTA가 없습니다</b>MFN 세율이 적용됩니다. 현지 조립(CKD), 제3국 생산 거점 활용, 또는 협정 발효 일정을 확인하세요.</div>`}`;
     if(c==='US')$('#fr').insertAdjacentHTML('beforeend',`<div class="callout crit"><b>FTA 0%여도 추가 관세가 있습니다</b>2026.7.24부터 한국산에 Section 301 관세가 기존 세율 포함 최대 12.5%까지 붙습니다. 의료기기 면제 여부는 아직 확인되지 않았습니다. <a class="lnk" href="#usa">미국 시장 화면에서 자세히 →</a></div>`);
     cmp(p);
@@ -1745,7 +1787,7 @@ def('integrations','설정','데이터 연동','환율·뉴스·통관 데이터
   <section class="card stack"><h2 class="ct">연결 구조</h2>
   <div class="flow"><div class="box"><b>외부 API</b><span class="note">수출입은행 환율 · 네이버 뉴스 · KOTRA · UNI-PASS</span></div><div class="arr">→</div>
   <div class="box hl"><b>회사 서버 (API 프록시)</b><span class="note">API 키 보관, 호출 횟수 제한 관리, 10–30분 캐시, 응답을 아래 형식으로 정리</span></div><div class="arr">→</div>
-  <div class="box"><b>이 웹사이트</b><span class="note">/api/fx, /api/news 만 호출. 키는 브라우저에 절대 노출되지 않음</span></div></div>
+  <div class="box"><b>이 웹사이트</b><span class="note">/api/fx, /api/news, /api/recall, /api/regwatch 만 호출. 키는 브라우저에 절대 노출되지 않음</span></div></div>
   <div class="callout warn"><b>브라우저에서 API를 직접 부르면 안 되는 이유</b>API 키가 페이지 소스에 그대로 노출되고, 네이버·수출입은행 API는 브라우저 교차 출처 호출(CORS)을 허용하지 않아 요청이 차단됩니다. 서버를 한 번 거쳐야 합니다.</div></section>
   <section class="card"><div class="card-h"><h2 class="ct">데이터 소스</h2><span class="sub">API 서버 주소: <span class="mono">${API_BASE?esc(API_BASE):'미설정'}</span></span></div>
   <div class="callout ${API_BASE&&LIVE.fx?'ok':'warn'}" style="margin-bottom:14px"><b>${API_BASE&&LIVE.fx?'실제 데이터를 받아오고 있습니다':'지금은 아래 기관에서 데이터를 가져오지 않습니다'}</b>${API_BASE&&LIVE.fx?'환율은 서버를 거쳐 수출입은행 API에서 받아온 값입니다.':'아래 표는 배포 후 <b>연결할 곳</b>의 목록입니다. 이 미리보기에서는 외부 API에 접속할 수 없어 환율은 예시 값(10월 7일 실제 매매기준율로 맞춘 고정값), 뉴스는 직접 모아 둔 기사 목록을 보여 줍니다. Vercel에 배포하고 환율 API 키를 넣으면 상태가 \'연결됨\'으로 바뀌고 매일 자동으로 갱신됩니다. Google 뉴스는 키가 필요 없지만 역시 서버(Vercel)가 있어야 받아올 수 있습니다.'}</div>
@@ -2072,7 +2114,7 @@ def('distributor','영업 · 채널','해외 대리점 재고·성과','대리�
 /* 20. invoice */
 def('invoice','무역 서류','인보이스·패킹리스트 생성','거래 정보와 품목을 입력하면 상업송장과 포장명세서가 작성됩니다. 작성한 서류는 보관함에 저장해 다시 불러올 수 있습니다.',root=>{
   const exporter=[PROFILE.company,PROFILE.address].filter(Boolean).join('\n')||'회사명\n주소';
-  let items=[{d:'Portable Ultrasound System AUR-US200 (w/ convex probe)',hs:'9018.12',q:40,u:4800,nw:6.2,gw:9.8},{d:'Linear Probe L12-4 for AUR-US200',hs:'9018.12',q:40,u:620,nw:.4,gw:.9}];
+  let items=[{d:'Portable Ultrasound System AUR-US200 (w/ convex probe)',hs:'9018.12',q:40,u:4800,nw:6.2,gw:9.8,lot:'US2606K',ex:'N/A'},{d:'Linear Probe L12-4 for AUR-US200',hs:'9018.12',q:40,u:620,nw:.4,gw:.9,lot:'PR2606A',ex:'N/A'}];
   let mode='CI';
   const FL=[['xp','수출자 (Shipper)',exporter],['cn','수입자 (Consignee)','Rhein Medizintechnik GmbH\nHafenstrasse 12, 20457 Hamburg, Germany'],['no','인보이스 번호','CI-26-0827'],['dt','일자',fd(TODAY)],['inc','인코텀즈','FOB Busan'],['pay','결제조건','T/T 45 days after B/L date'],['pol','선적항','Busan, Korea'],['pod','도착항','Hamburg, Germany'],['vs','선박 / 항차','COLDWAY HARMONY V.2609E']];
   root.innerHTML=head('무역 서류','인보이스·패킹리스트 생성',CUR.desc)+`
@@ -2081,24 +2123,27 @@ def('invoice','무역 서류','인보이스·패킹리스트 생성','거래 정
   <section class="card c-7 stack"><div class="card-h" style="margin:0"><div class="chips" id="imode"><button class="chip" data-m="CI" aria-pressed="true">Commercial Invoice</button><button class="chip" data-m="PL" aria-pressed="false">Packing List</button></div><div class="hstack"><button class="btn" id="icopy">텍스트 복사</button><button class="btn pri" id="isave">${ic('download')}보관함에 저장</button></div></div><div id="idoc"></div><textarea id="ifb" class="mono" hidden rows="6" style="width:100%"></textarea></section></div>
   <section class="card"><div class="card-h"><div><h2 class="ct">서류 보관함</h2><div class="sub">저장한 인보이스를 다시 열어 수정할 수 있습니다</div></div></div><div id="iarch"></div></section>`;
   const v=k=>$('#iv-'+k).value;
-  function drawItems(){$('#iitems').innerHTML=items.map((it,i)=>`<div class="item-row"><div class="field"><label>품명</label><input data-i="${i}" data-k="d" value="${esc(it.d)}"></div><div class="field"><label>HS</label><input data-i="${i}" data-k="hs" value="${esc(it.hs)}"></div><div class="field"><label>수량</label><input data-i="${i}" data-k="q" type="number" value="${it.q}"></div><div class="field"><label>단가 USD</label><input data-i="${i}" data-k="u" type="number" value="${it.u}"></div><button class="icon-btn" data-del="${i}" aria-label="품목 삭제">${ic('x')}</button></div>`).join('')}
+  function drawItems(){$('#iitems').innerHTML=items.map((it,i)=>`<div class="item-row"><div class="field"><label>품명</label><input data-i="${i}" data-k="d" value="${esc(it.d)}"></div><div class="field"><label>HS</label><input data-i="${i}" data-k="hs" value="${esc(it.hs)}"></div><div class="field"><label>수량</label><input data-i="${i}" data-k="q" type="number" value="${it.q}"></div><div class="field"><label>단가 USD</label><input data-i="${i}" data-k="u" type="number" value="${it.u}"></div><button class="icon-btn" data-del="${i}" aria-label="품목 삭제">${ic('x')}</button><div class="lot-pair"><div class="field"><label>로트 번호 (패킹리스트)</label><input data-i="${i}" data-k="lot" value="${esc(it.lot||'')}" placeholder="예: DX2607A"></div><div class="field"><label>유통기한 (패킹리스트)</label><input data-i="${i}" data-k="ex" value="${esc(it.ex||'')}" placeholder="예: 2027-07 또는 N/A"></div></div></div>`).join('')}
   function doc(){
     const tot=items.reduce((a,b)=>a+b.q*b.u,0),tq=items.reduce((a,b)=>a+b.q,0),nw=items.reduce((a,b)=>a+b.q*(b.nw||1),0),gw=items.reduce((a,b)=>a+b.q*(b.gw||1.5),0);
     const pr=s=>esc(s).replace(/\n/g,'<br>'),ctn=it=>Math.ceil(it.q/(it.u>1000?1:50));
-    const top=`<table><tr><th style="width:50%">Shipper / Exporter</th><th>No. & Date of Invoice</th></tr><tr><td rowspan="3">${pr(v('xp'))}</td><td>${esc(v('no'))} &nbsp;·&nbsp; ${esc(v('dt'))}</td></tr><tr><th>Terms of Delivery & Payment</th></tr><tr><td>${esc(v('inc'))}<br>${esc(v('pay'))}</td></tr>
+    const plNo=v('no').replace(/^CI/i,'PL');
+    const top=mode==='CI'?`<table><tr><th style="width:50%">Shipper / Exporter</th><th>No. & Date of Invoice</th></tr><tr><td rowspan="3">${pr(v('xp'))}</td><td>${esc(v('no'))} &nbsp;·&nbsp; ${esc(v('dt'))}</td></tr><tr><th>Terms of Delivery & Payment</th></tr><tr><td>${esc(v('inc'))}<br>${esc(v('pay'))}</td></tr>
+    <tr><th>Consignee</th><th>Port of Loading / Discharge</th></tr><tr><td rowspan="3">${pr(v('cn'))}</td><td>${esc(v('pol'))} → ${esc(v('pod'))}</td></tr><tr><th>Vessel / Voyage</th></tr><tr><td>${esc(v('vs'))}</td></tr></table>`
+    :`<table><tr><th style="width:50%">Shipper / Exporter</th><th>Packing List No. & Date</th></tr><tr><td rowspan="3">${pr(v('xp'))}</td><td>${esc(plNo)} &nbsp;·&nbsp; ${esc(v('dt'))}</td></tr><tr><th>Ref. Invoice No. / Delivery Term</th></tr><tr><td>${esc(v('no'))}<br>${esc(v('inc'))}</td></tr>
     <tr><th>Consignee</th><th>Port of Loading / Discharge</th></tr><tr><td rowspan="3">${pr(v('cn'))}</td><td>${esc(v('pol'))} → ${esc(v('pod'))}</td></tr><tr><th>Vessel / Voyage</th></tr><tr><td>${esc(v('vs'))}</td></tr></table>`;
     const body=mode==='CI'?`<table><tr><th>Description of Goods</th><th>HS Code</th><th class="r">Q'ty</th><th class="r">Unit Price</th><th class="r">Amount</th></tr>${items.map(it=>`<tr><td>${esc(it.d)}</td><td>${esc(it.hs)}</td><td class="r">${nf(it.q)} EA</td><td class="r">${usd(it.u,2)}</td><td class="r">${usd(it.q*it.u,2)}</td></tr>`).join('')}<tr><th colspan="2">TOTAL</th><th class="r">${nf(tq)} EA</th><th></th><th class="r">${usd(tot,2)}</th></tr></table>`
-    :`<table><tr><th>Description of Goods</th><th class="r">Q'ty</th><th class="r">Cartons</th><th class="r">N.W (kg)</th><th class="r">G.W (kg)</th></tr>${items.map(it=>`<tr><td>${esc(it.d)}</td><td class="r">${nf(it.q)} EA</td><td class="r">${ctn(it)} CTN</td><td class="r">${nf(it.q*(it.nw||1),1)}</td><td class="r">${nf(it.q*(it.gw||1.5),1)}</td></tr>`).join('')}<tr><th>TOTAL</th><th class="r">${nf(tq)} EA</th><th class="r">${items.reduce((a,it)=>a+ctn(it),0)} CTN</th><th class="r">${nf(nw,1)}</th><th class="r">${nf(gw,1)}</th></tr></table>`;
-    $('#idoc').innerHTML=`<div class="doc"><h3>${mode==='CI'?'COMMERCIAL INVOICE':'PACKING LIST'}</h3><div class="sub">Medical Devices · Country of Origin: Republic of Korea</div>${top}${body}<p style="margin:14px 0 0;font-size:11px;color:#444">We hereby certify that the goods are manufactured under ISO 13485:2016 quality management system${mode==='CI'?' and that this invoice is true and correct.':'.'}</p><p style="text-align:right;margin:24px 0 0">Signed by ____________________<br>${esc((v('xp').split('\n')[0])||'')}${PROFILE.person?`<br>${esc(PROFILE.person)}${PROFILE.role?' · '+esc(PROFILE.role):''}`:''}</p></div>`;
+    :`<table><tr><th>Description of Goods</th><th>Lot / Batch No.</th><th>Expiry Date</th><th class="r">Q'ty</th><th class="r">Cartons</th><th class="r">N.W (kg)</th><th class="r">G.W (kg)</th></tr>${items.map(it=>`<tr><td>${esc(it.d)}</td><td>${esc(it.lot||'—')}</td><td>${esc(it.ex||'—')}</td><td class="r">${nf(it.q)} EA</td><td class="r">${ctn(it)} CTN</td><td class="r">${nf(it.q*(it.nw||1),1)}</td><td class="r">${nf(it.q*(it.gw||1.5),1)}</td></tr>`).join('')}<tr><th colspan="3">TOTAL</th><th class="r">${nf(tq)} EA</th><th class="r">${items.reduce((a,it)=>a+ctn(it),0)} CTN</th><th class="r">${nf(nw,1)}</th><th class="r">${nf(gw,1)}</th></tr></table><p style="margin:10px 0 0;font-size:12px"><b>Shipping Marks:</b> AUR / ${esc(v('no'))} / C/NO. 1–${items.reduce((a,it)=>a+ctn(it),0)} / MADE IN KOREA<br><b>Total Packages:</b> ${items.reduce((a,it)=>a+ctn(it),0)} cartons · <b>Net Weight:</b> ${nf(nw,1)} kg · <b>Gross Weight:</b> ${nf(gw,1)} kg</p>`;
+    $('#idoc').innerHTML=`<div class="doc"><h3>${mode==='CI'?'COMMERCIAL INVOICE':'PACKING LIST'}</h3><div class="sub">Medical Devices · Country of Origin: Republic of Korea</div>${top}${body}<p style="margin:14px 0 0;font-size:11px;color:#444">${mode==='CI'?'We hereby certify that the goods are manufactured under ISO 13485:2016 quality management system and that this invoice is true and correct.':'We hereby certify that the contents are as described above and have been packed for export.'}</p><p style="text-align:right;margin:24px 0 0">Signed by ____________________<br>${esc((v('xp').split('\n')[0])||'')}${PROFILE.person?`<br>${esc(PROFILE.person)}${PROFILE.role?' · '+esc(PROFILE.role):''}`:''}</p></div>`;
     return {tot,tq,nw,gw}}
-  function text(){const s=doc();return `${mode==='CI'?'COMMERCIAL INVOICE':'PACKING LIST'}\nNo: ${v('no')}  Date: ${v('dt')}\nShipper: ${v('xp').replace(/\n/g,', ')}\nConsignee: ${v('cn').replace(/\n/g,', ')}\nTerms: ${v('inc')} / ${v('pay')}\nRoute: ${v('pol')} -> ${v('pod')} (${v('vs')})\n\n`+items.map(it=>mode==='CI'?`${it.d} | HS ${it.hs} | ${it.q} EA x ${usd(it.u,2)} = ${usd(it.q*it.u,2)}`:`${it.d} | ${it.q} EA | NW ${nf(it.q*(it.nw||1),1)}kg | GW ${nf(it.q*(it.gw||1.5),1)}kg`).join('\n')+(mode==='CI'?`\nTOTAL: ${usd(s.tot,2)}`:`\nTOTAL NW ${nf(s.nw,1)}kg / GW ${nf(s.gw,1)}kg`)}
+  function text(){const s=doc();return `${mode==='CI'?'COMMERCIAL INVOICE':'PACKING LIST'}\nNo: ${mode==='CI'?v('no'):v('no').replace(/^CI/i,'PL')}  Date: ${v('dt')}\nShipper: ${v('xp').replace(/\n/g,', ')}\nConsignee: ${v('cn').replace(/\n/g,', ')}\n${mode==='CI'?`Terms: ${v('inc')} / ${v('pay')}`:`Ref. Invoice: ${v('no')} / ${v('inc')}`}\nRoute: ${v('pol')} -> ${v('pod')} (${v('vs')})\n\n`+items.map(it=>mode==='CI'?`${it.d} | HS ${it.hs} | ${it.q} EA x ${usd(it.u,2)} = ${usd(it.q*it.u,2)}`:`${it.d} | Lot ${it.lot||'-'} | Exp ${it.ex||'-'} | ${it.q} EA | NW ${nf(it.q*(it.nw||1),1)}kg | GW ${nf(it.q*(it.gw||1.5),1)}kg`).join('\n')+(mode==='CI'?`\nTOTAL: ${usd(s.tot,2)}`:`\nTOTAL NW ${nf(s.nw,1)}kg / GW ${nf(s.gw,1)}kg`)}
   function arch(){$('#iarch').innerHTML=ARCHIVE.length?`<div class="tbl"><table class="data"><thead><tr><th>인보이스 번호</th><th>일자</th><th>수입자</th><th class="r">금액</th><th>저장 시각</th><th></th></tr></thead><tbody>${ARCHIVE.map(a=>`<tr><td class="mono">${esc(a.f.no)}</td><td class="mono">${esc(a.f.dt)}</td><td>${esc((a.f.cn||'').split('\n')[0])}</td><td class="r">${usd(a.total,2)}</td><td class="note">${esc(a.saved)}</td><td class="r" style="white-space:nowrap"><button class="btn sm" data-open-a="${a._id}">열기</button> <button class="btn sm ghost" data-del-a="${a._id}">삭제</button></td></tr>`).join('')}</tbody></table></div>`:`<p class="note" style="margin:0">아직 저장한 서류가 없습니다. 오른쪽 위 "보관함에 저장"을 누르면 여기에 쌓입니다.</p>`}
   drawItems();doc();arch();
   root.addEventListener('input',e=>{const t=e.target;if(t.dataset.i!=null){const it=items[+t.dataset.i];it[t.dataset.k]=['q','u'].includes(t.dataset.k)?+t.value||0:t.value}if(t.closest('.c-5'))doc()});
   $('#iitems').onclick=e=>{const b=e.target.closest('[data-del]');if(b&&items.length>1){items.splice(+b.dataset.del,1);drawItems();doc()}};
-  $('#iadd').onclick=()=>{items.push({d:'New item',hs:'9018.90',q:1,u:100,nw:1,gw:1.5});drawItems();doc()};
+  $('#iadd').onclick=()=>{items.push({d:'New item',hs:'9018.90',q:1,u:100,nw:1,gw:1.5,lot:'',ex:''});drawItems();doc()};
   $('#iload').onclick=()=>{const pk=$('#ipick');pk.hidden=!pk.hidden;pk.innerHTML=PRODUCTS.length?`<div class="note" style="margin-bottom:6px">내 제품에서 품목을 추가합니다</div>${PRODUCTS.map(p=>`<button class="chip" data-prod="${esc(p.id)}">${esc(p.short)}</button>`).join('')}`:`<span class="note">등록된 제품이 없습니다. "내 제품"에서 먼저 등록하세요.</span>`};
-  $('#ipick').onclick=e=>{const b=e.target.closest('[data-prod]');if(!b)return;const p=P(b.dataset.prod);items.push({d:p.name,hs:p.hs||'',q:1,u:p.price||0,nw:1,gw:1.5});drawItems();doc();toast(`${p.short}을(를) 추가했습니다.`)};
+  $('#ipick').onclick=e=>{const b=e.target.closest('[data-prod]');if(!b)return;const p=P(b.dataset.prod);items.push({d:p.name,hs:p.hs||'',q:1,u:p.price||0,nw:1,gw:1.5,lot:'',ex:/IVD|III/.test(p.cls||'')?'':'N/A'});drawItems();doc();toast(`${p.short}을(를) 추가했습니다.`)};
   $('#imode').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;mode=b.dataset.m;$$('#imode .chip').forEach(x=>x.setAttribute('aria-pressed',x===b));doc()};
   $('#icopy').onclick=()=>copyText(text(),$('#ifb'));
   $('#isave').onclick=()=>{const f={};FL.forEach(x=>f[x[0]]=v(x[0]));const s=doc();const ex=ARCHIVE.find(a=>a.f.no===f.no);const rec={_id:ex?ex._id:uidGen(),f,items:JSON.parse(JSON.stringify(items)),total:s.tot,saved:new Date().toLocaleString('ko-KR',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})};
@@ -2149,7 +2194,7 @@ const WSC={
  notes:{label:'업무 노트',arr:()=>NOTES,title:r=>r.title,fields:[F('kind','종류','select',{opts:['메모','할 일']}),F('tag','분류','select',{opts:TAGS}),F('title','제목','text',{req:1,full:1}),F('body','내용','textarea',{ph:'자유롭게 기록하세요. 링크, 연락처, 결정 사항 등'}),F('date','날짜 (마감일)','date'),F('pin','상단 고정','check'),F('done','완료','check')],
   defaults:()=>({kind:'메모',tag:'기타',date:fd(TODAY),pin:false,done:false,created:new Date().toISOString()})}
 };
-const OBJ_COLS=['profile','checklist','approvals','apprMemo'];
+const OBJ_COLS=['profile','checklist','approvals','apprMemo','carriers'];
 
 /* 예시 데이터 → 날짜 필드로 변환한 시드 */
 const SEED={};
@@ -2171,7 +2216,7 @@ function makeSeeds(){
    {kind:'메모',tag:'선적',title:'Rhein 향 SH-2609-009 ETA 3일 지연 공유',body:'Coldway Ocean 스케줄 변경. 바이어에게 변경 ETA 메일 발송 완료.',date:fd(addDays(TODAY,-2)),pin:false,done:false},
    {kind:'할 일',tag:'입찰',title:'베트남 카테터 입찰 기술평가 서류 번역 의뢰',body:'',date:fd(addDays(TODAY,10)),pin:false,done:true}];
   SEED.coldlogs=[];SEED.archive=[];
-  SEED.profile={...PROFILE};SEED.checklist={};SEED.approvals=seedAppr();SEED.apprMemo={};
+  SEED.profile={...PROFILE};SEED.checklist={};SEED.approvals=seedAppr();SEED.apprMemo={};SEED.carriers={routes:CARR_BASE.map(([r,m,v])=>({r,m,v:[...v]}))};
   for(const k of Object.keys(SEED))if(Array.isArray(SEED[k]))SEED[k].forEach(r=>r._id=r._id||uidGen());
 }
 /* 저장된 예시 기록 보정: 예전 예시 값이 그대로 남아 있는 경우에만 고칩니다(직접 수정한 값은 건드리지 않음). */
@@ -2190,6 +2235,7 @@ function applyCol(n,v){
   else if(n==='checklist')CHECKLIST=v||{};
   else if(n==='approvals'){for(const k of Object.keys(APPR))delete APPR[k];Object.assign(APPR,migrateAppr(v||{}))}
   else if(n==='apprMemo')APPR_MEMO=v||{};
+  else if(n==='carriers')CARR=(v&&Array.isArray(v.routes))?{routes:v.routes.filter(l=>l&&typeof l.r==='string'&&Array.isArray(l.v)).map(l=>({r:l.r,m:l.m==='해상'?'해상':'항공',v:CARR_CARS.map((_,i)=>{const x=l.v[i];return x==null||x===''||isNaN(+x)?null:+x})}))}:{routes:[]};
   hydrate(n);
 }
 function hydrate(n){
@@ -2202,7 +2248,7 @@ function hydrate(n){
 }
 function serialize(n){
   if(ARRS[n]){const D=WSC[n],drop=D&&D.dates?Object.values(D.dates):[];return ARRS[n].map(r=>{const o={...r};drop.forEach(k=>delete o[k]);return o})}
-  return n==='profile'?{...PROFILE}:n==='checklist'?CHECKLIST:n==='approvals'?APPR:n==='apprMemo'?APPR_MEMO:null;
+  return n==='profile'?{...PROFILE}:n==='checklist'?CHECKLIST:n==='approvals'?APPR:n==='apprMemo'?APPR_MEMO:n==='carriers'?CARR:null;
 }
 const ALL_COLS=[...Object.keys(ARRS),...OBJ_COLS];
 
@@ -2481,10 +2527,10 @@ function heroArtCalc(){return `<svg class="hero-art" viewBox="0 0 420 260" aria-
  <g transform="translate(212 204)"><rect width="150" height="40" rx="12" fill="#0B1B2C"/><text x="16" y="25" style="font:600 12px var(--sans);fill:#7FD3D0">Landed Cost</text><text x="136" y="25" text-anchor="end" style="font:700 13px var(--mono);fill:#fff">+23.0%</text></g></svg>`}
 function heroSlides(){
   const cat=store.get('aur-mcat','치과'),top=MK.map(c=>mkScore(cat,c)).filter(Boolean).sort((a,b)=>b.score-a.score).slice(0,3);
-  const lic30=LICENSES.filter(l=>l.exp>=0&&l.exp<=30).length,live=SHIPMENTS.filter(s=>s.stage<6).length;
+  const lic30=LICENSES.filter(l=>l.exp>=0&&l.exp<=30).length,live=SHIPMENTS.filter(s=>s.stage<6).length;const lic0=LICENSES.filter(l=>l.exp<0).length;
   const geo={US:[118,98],CA:[120,74],MX:[124,120],BR:[160,178],CL:[146,196],DE:[206,82],FR:[198,90],IT:[212,96],ES:[192,98],GB:[194,76],TR:[230,98],RU:[256,70],KZ:[262,86],CN:[290,104],JP:[318,100],IN:[262,124],TH:[286,130],VN:[294,128],ID:[300,156],MY:[290,146],PH:[312,134],SG:[292,150],AU:[320,190],SA:[238,122],AE:[248,124],EG:[224,116],ZA:[226,184]};
   return[
-   {theme:'dark',eyebrow:'Aurelis Global Trade Console',title:'의료기기 수출의 모든 순간을<br>한 화면에서',text:`인허가부터 선적, 콜드체인, 대금 회수까지 27개국 수출 업무를 기록하고 관리합니다. 지금 진행 중인 선적 ${live}건, 30일 안에 만료되는 인허가 ${lic30}건이 있습니다.`,cta:[['오늘 할 일 보기','#notes','pri'],['기능 둘러보기','#cmdk','ghost']],art:heroArtIntro()},
+   {theme:'dark',eyebrow:'Aurelis Global Trade Console',title:'의료기기 수출의 모든 순간을<br>한 화면에서',text:`인허가부터 선적, 콜드체인, 대금 회수까지 27개국 수출 업무를 기록하고 관리합니다. 지금 진행 중인 선적 ${live}건, ${lic0?`이미 만료된 인허가 ${lic0}건과 `:''}30일 안에 만료되는 인허가 ${lic30}건이 있습니다.`,cta:[['오늘 할 일 보기','#notes','pri'],['기능 둘러보기','#cmdk','ghost']],art:heroArtIntro()},
    {theme:'dark',eyebrow:'UNITED STATES · 수출 1위 국가',title:'한국 의료기기 수출의 14.9%,<br>미국 시장을 한눈에',text:'2025년 대미 수출 8.0억 달러. 2026년 7월부터 붙은 새 관세(최대 12.5%), FDA 인허가 경로와 비용, 진출 10단계를 정리했습니다.',cta:[['미국 시장 집중 분석','#usa','pri'],['미국 필수 서류','#docs','ghost']],art:heroArtUSA()},
    {theme:'sky',eyebrow:`${cat} 품목 · 진출 분석 (예시 지표)`,title:`예시 지표로 본 진출 추천 1위는<br><span class="hl">${top[0]?COUNTRY[top[0].c]:'—'}</span>입니다`,text:`수요와 현지 공급, 인허가 난이도, FTA 혜택을 함께 따졌습니다. 2위 ${top[1]?COUNTRY[top[1].c]:'—'}, 3위 ${top[2]?COUNTRY[top[2].c]:'—'}. 품목군을 바꿔 다른 결과도 확인해 보세요.`,cta:[['글로벌 시장 동향','#market','pri'],['승인 매트릭스','#approvals','ghost']],art:heroArtGlobe(top.map(t=>geo[t.c]||[210,130]))},
    {theme:'mint',eyebrow:'가격 · 관세 계산',title:'원가, 관세, 판매가를<br>한 번에 계산하세요',text:'Landed Cost로 도착 원가를, FTA 시뮬레이터로 관세 절감액을, 손익분기 계산기로 최소 판매가를 구합니다.',cta:[['Landed Cost','#landed','pri'],['FTA 관세','#fta','ghost'],['손익분기','#bep','ghost']],art:heroArtCalc()}]}
@@ -2549,6 +2595,23 @@ const EXPOS=[
  {c:'EG',n:'Africa Health ExCon',ko:'아프리카 헬스 엑스콘',city:'카이로',venue:'Egypt International Exhibition Center',m:[6],cyc:'매년',f:['종합'],last:['2026-06-15','2026-06-18'],next:null,q:'s',url:'https://www.worldhealthexpo.com/events/healthcare/africahealthexcon/',tip:'이집트 통합조달청(UPA)이 함께 주최해 공공조달 정보를 얻기 좋습니다.'},
  {c:'ZA',n:'WHX Johannesburg (구 Africa Health)',ko:'WHX 요하네스버그',city:'요하네스버그',venue:'Gallagher Convention Centre',m:[10],cyc:'매년',f:['종합','체외진단'],last:['2026-10-06','2026-10-08'],next:null,q:'o',url:'https://www.worldhealthexpo.com/events/healthcare/johannesburg/',tip:''}];
 const EXPO_F={'종합':'','병원':'','체외진단':'체외진단','치과':'치과','제조·부품':'','재활':'재활·보조','디지털':'디지털헬스'};
+/* 일정 갱신: 배포 사이트의 public/expos.json 에 바뀐 날짜만 적으면 코드를 고치지 않고 반영됩니다. (미리보기에서는 파일이 없어 건너뜁니다) */
+let EXPO_ASOF='2026-10-08',EXPO_LOADED=false;
+const okD=a=>Array.isArray(a)&&a.length===2&&a.every(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)&&!isNaN(new Date(d)))&&a[0]<=a[1];
+async function loadExpoUpdates(){
+  if(EXPO_LOADED)return false;EXPO_LOADED=true;
+  try{
+    const r=await fetch('expos.json',{cache:'no-cache',headers:{Accept:'application/json'}});if(!r.ok)return false;
+    const j=await r.json();let n=0;
+    (j.updates||[]).forEach(u=>{
+      const x=EXPOS.find(e=>e.n===u.n);if(!x){console.warn('expos.json: 이름이 맞는 박람회가 없습니다 →',u.n);return}
+      if(('next' in u&&u.next!==null&&!okD(u.next))||('last' in u&&u.last!==null&&!okD(u.last))){console.warn('expos.json: 날짜 형식이 올바르지 않습니다 →',u.n);return}
+      ['last','next','city','venue','url','q','m','cyc','tip'].forEach(k=>{if(k in u)x[k]=u[k]});
+      if(x.next){delete x.unk;x.q=u.q||'o'}n++});
+    if(/^\d{4}-\d{2}-\d{2}$/.test(j.asof||''))EXPO_ASOF=j.asof;
+    return n>0||!!j.asof;
+  }catch(e){return false}
+}
 
 function expoWhen(x){
   if(x.none)return null;
@@ -2570,10 +2633,11 @@ def('expos','영업 · 채널','글로벌 의료기기 박람회','사이트에 
   root.innerHTML=head('영업 · 채널','글로벌 의료기기 박람회',CUR.desc)+`
   <div class="callout"><b>박람회가 중요한 이유</b>의료기기는 인허가와 현지 유통망이 있어야 팔리기 때문에, 대리점 후보·병원 구매 담당자·인증 컨설턴트를 한곳에서 만날 수 있는 박람회가 해외 영업의 출발점입니다. KOTRA·한국보건산업진흥원·한국의료기기산업협회가 주요 전시회에 한국관을 꾸리고 참가비 일부를 지원하니, 보통 전시 수개월 전에 열리는 모집 공고를 확인하세요.</div>
   <div class="kpis" id="xk"></div>
-  <section class="card"><div class="card-h"><div><h2 class="ct">연간 개최 시기</h2><div class="sub">막대 = 보통 열리는 달 · 점 = 확정된 다음 회차 · 2026년 10월 8일 조사</div></div>
+  <section class="card"><div class="card-h"><div><h2 class="ct">연간 개최 시기</h2><div class="sub">막대 = 보통 열리는 달 · 점 = 확정된 다음 회차 · <span id="xasof">일정 확인일 2026-10-08</span></div></div>
    <div class="hstack" style="gap:8px;flex-wrap:wrap"><div class="chips" id="xcont">${['전체',...CONT_ORDER,'국내'].map(c=>`<button class="chip" data-c="${c}" aria-pressed="${c===cont}">${c}</button>`).join('')}</div>
    <select id="xf" style="height:34px">${['전체','종합','병원','체외진단','치과','제조·부품','재활','디지털'].map(f=>`<option ${f===fil?'selected':''}>${f}</option>`).join('')}</select></div></div>
    <div class="xcal-wrap"><div class="xcal" id="xcal"></div></div></section>
+  <section class="card" id="xchk"></section>
   <div class="row"><section class="card c-7"><div class="card-h"><div><h2 class="ct">다가오는 박람회</h2><div class="sub">오늘 기준 가까운 순 · '예상'은 지난 개최 패턴으로 추정한 시기</div></div></div><div id="xlist" class="stack" style="gap:10px"></div></section>
   <section class="card c-5 stack"><h2 class="ct">참가 준비 일정</h2><div class="note" id="xprepT"></div><ol class="steps" id="xprep"></ol>
    <div class="callout warn" style="margin-top:4px"><b>일정은 바뀔 수 있습니다</b>날짜·장소는 주최 측 사정으로 바뀌곤 합니다(예: 오사카 행사 가을 이동, CMEF 추계 개최 도시 순환). 참가 결정 전 공식 사이트에서 다시 확인하세요.</div></section></div>`;
@@ -2587,6 +2651,11 @@ def('expos','영업 · 채널','글로벌 의료기기 박람회','사이트에 
     const in90=up.filter(o=>o.w.sure&&dleft(o.w.a)<=90&&dleft(o.w.b)>=0).length;
     const now=up.filter(o=>o.w.sure&&dleft(o.w.a)<=0&&dleft(o.w.b)>=0);
     $('#xk').innerHTML=`<div class="kpi"><span class="l">수록 박람회</span><span class="v">${real.length}개</span><span class="d">${new Set(real.map(x=>x.c)).size}개국</span></div><div class="kpi"><span class="l">90일 안에 개막</span><span class="v">${in90}개</span><span class="d">${now.length?'지금 진행 중: '+now.map(o=>o.x.n).join(', '):'진행 중인 행사 없음'}</span></div><div class="kpi"><span class="l">내 품목 관련</span><span class="v">${real.filter(x=>rel(x).length).length}개</span><span class="d">치과·체외진단 등 전문 전시</span></div><div class="kpi"><span class="l">거래 국가 개최</span><span class="v">${real.filter(x=>trade.has(x.c)).length}개</span><span class="d">대리점·인보이스가 있는 나라</span></div>`;
+    $('#xasof').textContent='일정 확인일 '+EXPO_ASOF;
+    const need=real.map(x=>({x,w:expoWhen(x)})).filter(o=>!o.w||!o.w.sure);
+    $('#xchk').innerHTML=`<div class="card-h"><div><h2 class="ct">일정 확인이 필요한 박람회 ${need.length}곳</h2><div class="sub">다음 회차 날짜가 아직 입력되지 않아 지난 개최 패턴으로 추정한 곳입니다. 주최 측이 발표하면 날짜를 넣어 주세요.</div></div></div>
+     <div class="xneed">${need.map(({x,w})=>`<div class="xn1"><div><b>${esc(x.n)}</b> <span class="code">${x.c}</span><div class="note">${w?`${w.a.getFullYear()}년 ${w.a.getMonth()+1}월경 (예상)`:'일정 미확인'} · ${esc(x.cyc||'')}</div></div><a class="btn sm" href="${x.url?esc(x.url):'https://www.google.com/search?q='+encodeURIComponent(x.n+' '+(TODAY.getFullYear()+1)+' dates')}" target="_blank" rel="noopener">${x.url?'공식 사이트':'검색'} ↗</a></div>`).join('')||'<p class="note">모든 박람회의 다음 일정이 확정되어 있습니다.</p>'}</div>
+     <p class="note" style="margin:10px 0 0">배포한 사이트에서는 <span class="mono">public/expos.json</span> 에 날짜만 적으면 코드를 고치지 않아도 반영됩니다. (README의 '박람회 일정 갱신' 참고)</p>`;
     const M=TODAY.getMonth();
     $('#xcal').innerHTML=`<div class="xr xh"><div class="xn">박람회</div>${Array.from({length:12},(_,i)=>`<div class="xm ${i===M?'cur':''}">${i+1}월</div>`).join('')}</div>`+
      list.map(x=>{if(x.none)return `<div class="xr"><div class="xn"><span class="code">${x.c}</span> ${COUNTRY[x.c]} <span class="note">· 전용 박람회 없음</span></div><div class="xnone">${x.tip}</div></div>`;
@@ -2613,6 +2682,7 @@ def('expos','영업 · 채널','글로벌 의료기기 박람회','사이트에 
   $('#xcont').onclick=e=>{const b=e.target.closest('[data-c]');if(!b)return;cont=b.dataset.c;store.set('aur-xcont',cont);more=false;$$('#xcont .chip').forEach(c=>c.setAttribute('aria-pressed',c===b));draw()};
   $('#xf').onchange=e=>{fil=e.target.value;store.set('aur-xf',fil);draw()};
   draw();
+  loadExpoUpdates().then(ok=>{if(ok&&CUR&&CUR.id==='expos'&&document.getElementById('xchk'))draw()});
 },()=>EXPOS.filter(x=>{const w=expoWhen(x);return w&&w.sure&&dleft(w.a)<=30&&dleft(w.b)>=0}).length);
 
 const NAV_ORDER=['dashboard','usa','fx','market','notes','products','profile','tracking','coldchain','disposal','carriers','licenses','approvals','docs','udi','recall','expiry','landed','fta','bep','hs','expos','tender','distributor','invoice','integrations'];
@@ -2623,10 +2693,70 @@ function buildNav(){$('#nav').innerHTML=GROUPS.map(g=>`<div class="nav-group"><h
 /* 모바일에서 칸이 많은 표를 카드 형태로 보여 주기 위해 각 칸에 머리글 이름을 붙입니다 */
 function cardify(){document.querySelectorAll('#view table.data:not(.heat):not(.mx):not(.grid)').forEach(t=>{const hs=[...t.querySelectorAll('thead th')].map(th=>th.textContent.trim());if(hs.length<5)return;t.classList.add('cards');t.querySelectorAll('tbody tr').forEach(tr=>{if(tr.dataset.cd===String(tr.cells.length))return;tr.dataset.cd=tr.cells.length;if(tr.cells.length!==hs.length)return;[...tr.cells].forEach((td,i)=>td.setAttribute('data-label',hs[i]||''))})})}
 let cardQ=0;new MutationObserver(()=>{if(cardQ)return;cardQ=requestAnimationFrame(()=>{cardQ=0;cardify()})}).observe(document.getElementById('view')||document.body,{childList:true,subtree:true});
+const ASOF='2026-10-08';
+const SRCFOOT={
+  licenses:['인허가 기한과 요건은 국가·품목 등급에 따라 달라지며, 실제 신청 전 반드시 해당 기관에서 확인하세요.',[['식약처 의료기기 안전','https://www.mfds.go.kr'],['미국 FDA 의료기기','https://www.fda.gov/medical-devices'],['EU 의료기기 규정','https://health.ec.europa.eu/medical-devices-sector_en']]],
+  approvals:['국가별 승인 요건은 예시 정리본입니다. 최신 규정은 각국 규제기관에서 확인하세요.',[['식약처','https://www.mfds.go.kr'],['미국 FDA 의료기기','https://www.fda.gov/medical-devices'],['EU 의료기기 규정','https://health.ec.europa.eu/medical-devices-sector_en']]],
+  docs:['필요 서류는 국가·품목마다 다를 수 있습니다. 제출 전 규제기관 안내를 확인하세요.',[['식약처','https://www.mfds.go.kr'],['미국 FDA 의료기기','https://www.fda.gov/medical-devices'],['EU 의료기기 규정','https://health.ec.europa.eu/medical-devices-sector_en']]],
+  udi:['UDI 요건과 시행 시기는 국가별로 다릅니다.',[['의료기기정보포털(식약처)','https://udiportal.mfds.go.kr'],['미국 GUDID','https://accessgudid.nlm.nih.gov'],['EU EUDAMED','https://ec.europa.eu/tools/eudamed']]],
+  recall:['리콜 목록은 예시 데이터입니다. 실제 리콜은 규제기관 공지에서 확인하세요.',[['식약처','https://www.mfds.go.kr'],['미국 FDA 리콜','https://www.fda.gov/medical-devices/medical-device-safety/medical-device-recalls']]],
+  fta:['협정세율과 원산지 기준은 협정 개정·품목별 규정에 따라 달라집니다. 적용 전 관세청 등 공식 자료로 확인하세요.',[['관세청','https://www.customs.go.kr'],['관세청 UNI-PASS','https://unipass.customs.go.kr']]],
+  landed:['관세율과 부대비용은 예시 계산용입니다. 실제 견적 전 관세율과 운임을 확인하세요.',[['관세청','https://www.customs.go.kr'],['관세청 UNI-PASS','https://unipass.customs.go.kr']]],
+  hs:['HS코드 분류는 최종적으로 수입국 세관 판단에 따릅니다.',[['관세청 UNI-PASS','https://unipass.customs.go.kr'],['WCO HS','https://www.wcoomd.org']]],
+  expos:['박람회 일정은 변경될 수 있습니다. 참가 전 각 박람회 공식 사이트를 확인하세요.',[]]
+};
+/* ---- 최신 정보 불러오기 (배포 사이트에서만 동작) ---- */
+const LIVEBOX={
+  recall:{t:'FDA 최신 리콜 불러오기',d:'미국 FDA가 공개하는 의료기기 리콜 목록(openFDA)을 서버를 거쳐 가져옵니다. 키는 필요 없습니다.',kind:'recall'},
+  approvals:{t:'FDA 최신 규정·가이던스 불러오기',d:'미국 연방관보에 올라온 FDA 의료기기 관련 규칙·공고·가이던스입니다. 규정을 자동 반영하는 것이 아니라 확인할 소식 목록입니다.',kind:'reg',topics:[['fda','FDA 규정·가이던스']]},
+  fta:{t:'FTA·관세 최근 소식 불러오기',d:'최근 30일의 FTA 발효·서명·관세 정책 기사 목록입니다. 협정세율 표를 자동으로 고치는 것이 아니라, 표를 갱신해야 할지 확인하는 단서입니다.',kind:'reg',topics:[['fta','FTA 발효·서명'],['tariff','관세 정책']]}
+};
+function liveBox(m){
+  const c=LIVEBOX[m.id];if(!c)return null;
+  const d=document.createElement('section');d.className='card livebox';
+  const rc=c.kind==='recall';
+  d.innerHTML=`<div class="card-h"><div><h2 class="ct">${c.t}</h2><div class="sub">${c.d}</div></div></div>
+  <div class="lb-ctl">${rc?`<label class="lb-f">기간<select id="lbDays"><option value="30">최근 30일</option><option value="90" selected>최근 90일</option><option value="180">최근 180일</option></select></label>
+   <label class="lb-f">제품 단어(영문)<input id="lbQ" placeholder="예: catheter" maxlength="30"></label>
+   <label class="lb-chk"><input type="checkbox" id="lbKr"> 한국 회사만</label>
+   <button class="btn" id="lbGo" type="button">불러오기</button>`
+   :c.topics.map(([k,n],i)=>`<button class="btn${i?'':' pri'}" data-t="${k}" type="button">${n} 불러오기</button>`).join('')}</div>
+  <div id="lbOut" class="lb-out" aria-live="polite"></div>`;
+  const out=d.querySelector('#lbOut');
+  const msg=(cls,h)=>{out.innerHTML=`<div class="callout ${cls}">${h}</div>`};
+  const list=(items,mk)=>`<div class="lb-list">${items.map(mk).join('')}</div>`;
+  async function go(path){
+    if(!API_BASE){msg('warn','<b>지금 보고 있는 Claude 미리보기에서는 외부 사이트에 접속할 수 없어 이 버튼이 동작하지 않습니다</b>오류가 아니라 미리보기의 제한입니다. Vercel에 배포한 사이트 주소(…vercel.app)에서 열어 누르면 실제 최신 정보를 가져옵니다.');return null}
+    msg('','불러오는 중…');
+    try{const r=await fetch(`${API_BASE}/${path}`,{headers:{Accept:'application/json'}});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||('HTTP '+r.status));return j}
+    catch(e){msg('crit',`<b>불러오지 못했습니다</b>${esc(e.message)}${/404/.test(e.message)?' · 배포한 저장소의 api 폴더에 recall.js, regwatch.js 가 들어 있는지 확인하세요.':''}`);return null}
+  }
+  if(rc){d.querySelector('#lbGo').onclick=async()=>{
+    const q=new URLSearchParams({days:d.querySelector('#lbDays').value});const w=d.querySelector('#lbQ').value.trim();if(w)q.set('q',w);if(d.querySelector('#lbKr').checked)q.set('country','korea');
+    const j=await go('recall?'+q);if(!j)return;
+    if(!j.items.length){msg('warn',`<b>조건에 맞는 리콜이 없습니다</b>${j.from} ~ ${j.to} 사이 FDA 공개 데이터에서 찾지 못했습니다. 기간을 늘리거나 단어를 바꿔 보세요.`);return}
+    out.innerHTML=`<p class="note" style="margin:0 0 8px">${esc(j.source)} · ${j.from} ~ ${j.to} 시작분 · 조건에 맞는 ${j.shown}건 표시 (기간 내 전체 ${nf(j.total)}건, 최신순 100건 중에서 선택) · 가져온 시각 ${esc(j.collected)}${j.dataUpdated?` · FDA 데이터 갱신 ${esc(j.dataUpdated)}`:''}</p>`+
+    list(j.items,i=>`<a class="lb-item" href="${esc(i.url)}" target="_blank" rel="noopener"><div class="lb-h"><b>${esc(i.firm)}</b><span class="code">${esc(i.country||'—')}</span>${i.status?pill(/open/i.test(i.status)?'warn':'plain',esc(i.status)):''}${i.deviceClass?pill('info','Class '+esc(i.deviceClass)+' 기기'):''}</div><div class="lb-p">${esc(i.product)}</div><div class="lb-r">${esc(i.reason)}</div><div class="lb-m">${esc(i.date)}${i.specialty?' · '+esc(i.specialty):''}${i.qty?' · '+esc(i.qty):''} ↗</div></a>`)+
+    `<p class="note" style="margin:10px 0 0">미국 FDA 공개 데이터로, 검증되지 않은 정보이며 의사결정의 근거로 쓰기 전에 원문을 확인해야 합니다. '기기 Class'는 기기 자체의 위험 등급이고, 리콜 Class(I·II·III)와는 다릅니다.</p>`}}
+  else d.querySelectorAll('button[data-t]').forEach(b=>b.onclick=async()=>{
+    const j=await go('regwatch?topic='+b.dataset.t);if(!j)return;
+    out.innerHTML=`<p class="note" style="margin:0 0 8px">가져온 시각 ${esc(j.collected)} · 최신순 ${j.items.length}건${b.dataset.t==='fda'?' · 영문 원문':''}</p>`+
+    list(j.items,i=>`<a class="lb-item" href="${esc(i.url)}" target="_blank" rel="noopener"><div class="lb-h"><b>${esc(i.title)}</b></div>${i.note?`<div class="lb-r">${esc(i.note)}</div>`:''}<div class="lb-m">${esc(i.date||'')} · ${esc(i.source)}${i.kind&&i.kind!=='기사'?' · '+esc(i.kind):''} ↗</div></a>`)+
+    `<p class="note" style="margin:10px 0 0">기사·공고의 제목만 모은 목록입니다. 실제 규정이나 세율은 공식 출처에서 확인한 뒤 반영하세요.</p>`});
+  return d;
+}
+function srcFoot(m){
+  const s=SRCFOOT[m.id];if(!s)return null;
+  const d=document.createElement('div');d.className='srcfoot';
+  d.innerHTML=`<div class="sf-t"><b>기준일 ${ASOF}</b> · 직접 정리한 정보이며 자동으로 갱신되지 않습니다.</div><div class="sf-n">${s[0]}</div>${s[1].length?`<div class="sf-l">${s[1].map(([n,u])=>`<a class="btn sm" href="${u}" target="_blank" rel="noopener">${n} ↗</a>`).join('')}</div>`:''}`;
+  return d;
+}
 function route(keep){
   const id=(location.hash||'#dashboard').slice(1),m=MODS.find(x=>x.id===id)||MODS[0];
   CUR=m;charts=[];const v=$('#view');v.innerHTML='';const root=document.createElement('div');root.className='stack'+(keep?'':' view-in');root.style.gap='20px';v.appendChild(root);
   try{m.render(root)}catch(err){console.error(err);root.innerHTML=head(m.g,m.title,m.desc)+`<div class="callout crit"><b>이 화면을 그리지 못했습니다</b>입력한 기록 중 형식이 맞지 않는 값이 있을 수 있습니다. 해당 기록을 수정하거나 "내 정보 · 데이터 관리"에서 백업 후 되돌려 보세요.</div>`}
+  try{const lb=liveBox(m);if(lb)v.appendChild(lb)}catch(e){console.error(e)}
+  try{const sf=srcFoot(m);if(sf)v.appendChild(sf)}catch(e){}
   $$('.nav-item').forEach(a=>{if(a.dataset.id===m.id)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current')});
   $('#crumbs').innerHTML=`<span class="g">${m.g}</span><span class="g">/</span><b>${m.title}</b>`;
   closeSide();if(!keep)window.scrollTo(0,0);store.set('aur-last',m.id);
@@ -2699,7 +2829,7 @@ Promise.race([connectP,new Promise(r=>setTimeout(r,2500))]).then(()=>{
   const o=$('#onb');o.hidden=false;$('#onbCo').value=PROFILE.company||'';$('#onbWhere').textContent=WS.mode==='cloud'?'입력한 기록은 내 claude.ai 계정에 저장되어 다른 기기에서도 이어서 볼 수 있고, 이 페이지를 함께 보는 다른 사람에게는 보이지 않습니다.':'입력한 기록은 이 브라우저에 저장됩니다. 다른 기기로 옮기려면 "내 정보 · 데이터 관리"에서 백업 파일을 받으세요.';
   let startMode='sample';$('#onbMode').onclick=e=>{const b=e.target.closest('[data-mode]');if(!b)return;startMode=b.dataset.mode;$$('#onbMode [data-mode]').forEach(x=>x.setAttribute('aria-pressed',x===b))};
   $('#onbGo').onclick=()=>{PROFILE.person=$('#onbName').value.trim();PROFILE.company=$('#onbCo').value.trim()||PROFILE.company;PROFILE.onboarded=true;
-    if(startMode==='empty'){ALL_COLS.forEach(n=>{if(ARRS[n])applyCol(n,[]);else if(n==='checklist'||n==='apprMemo')applyCol(n,{});else if(n==='approvals')applyCol(n,{})});PROFILE.hideColdSamples=true;rebuildCold();ALL_COLS.forEach(n=>{if(n!=='profile')WS.save(n)})}
+    if(startMode==='empty'){ALL_COLS.forEach(n=>{if(ARRS[n])applyCol(n,[]);else if(n==='checklist'||n==='apprMemo'||n==='carriers')applyCol(n,{});else if(n==='approvals')applyCol(n,{})});PROFILE.hideColdSamples=true;rebuildCold();ALL_COLS.forEach(n=>{if(n!=='profile')WS.save(n)})}
     persist('profile');o.hidden=true;applyBrand();buildNav();const here=(location.hash||'#dashboard').slice(1);location.hash=startMode==='empty'?'products':(MODS.some(m=>m.id===here)?here:'dashboard');route(true);toast(startMode==='empty'?'먼저 수출하는 제품을 등록해 보세요.':'예시 데이터로 시작합니다. 언제든 수정하거나 지울 수 있습니다.')};
 });
 
