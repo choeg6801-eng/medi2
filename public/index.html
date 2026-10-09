@@ -1123,7 +1123,43 @@ const CAT_FOCUS={'영상진단':{US:10,IN:12,ID:10,SA:10,BR:8,VN:8,EG:8},'환자
 /* 품목군별 현지 공급이 강한 나라 (경쟁 가중) */
 const CAT_SUPPLY={'치과':{CN:10,DE:8,US:6,KR:0},'영상진단':{US:5,DE:5,JP:6,CN:8},'소모품':{CN:10,IN:6,MY:8},'체외진단':{US:6,DE:6,CN:8},'미용·피부':{US:4,FR:6,CN:4},'재활·보조':{DE:6,JP:4},'안과':{US:6,DE:4,JP:4}};
 const RISK={RU:12,IR:15};
-function mkScore(cat,c){const a=MKT_ATTR[c];if(!a)return null;const [size,growth,local,reg,fta]=a;
+
+/* ── 실시간 무역통계(UN Comtrade) 연동: /api/trade ──
+   수요 지수 = 국가별 '수입액'(로그 눈금 60%) + 전년 대비 증가율(40%). 연결 전·자료 없는 칸은 기존 예시 지표를 씁니다. */
+const CAT_HS={"영상진단":{"hs":["901812","902212","902214"],"label":"초음파·CT·X선 장치(HS 9018.12, 9022.12/.14)"},"환자감시":{"hs":["901819"],"label":"환자감시·전기진단기기(HS 9018.19)"},"소모품":{"hs":["901831","901839"],"label":"주사기·카테터(HS 9018.31/.39)"},"체외진단":{"hs":["382219","382213"],"label":"체외진단 시약(HS 3822)"},"치과":{"hs":["902121","902129"],"label":"치과용 임플란트·인공치아(HS 9021.21/.29)"},"정형·이식":{"hs":["902131","902110"],"label":"인공관절·정형기구(HS 9021.31/.10)"},"수술기기":{"hs":["901890"],"label":"수술·기타 의료기기(HS 9018.90)"},"호흡·치료":{"hs":["901920"],"label":"호흡기·산소치료기(HS 9019.20)"},"재활·보조":{"hs":["902140"],"label":"보청기(HS 9021.40)"},"안과":{"hs":["901850"],"label":"안과용 기기(HS 9018.50)"},"디지털헬스":{"hs":["901811"],"label":"심전계(HS 9018.11)"}};
+const TRADE={exp:{},imp:{}},IMPSC={};
+const hsKey=cat=>CAT_HS[cat]?CAT_HS[cat].hs.join(','):'';
+function rebuildImp(key){
+  const d=TRADE.imp[key];if(!d||!d.rows)return;
+  const ent=Object.entries(d.rows).filter(([c,o])=>o&&o.v>0);if(ent.length<3)return;
+  const lg=ent.map(([c,o])=>Math.log10(o.v)),lo=Math.min(...lg),hi=Math.max(...lg);
+  const sc={};
+  ent.forEach(([c,o],i)=>{const size=hi>lo?10+90*(lg[i]-lo)/(hi-lo):50;const gp=o.g==null?50:Math.max(0,Math.min(100,50+o.g*2.5));sc[c]=Math.round(.6*size+.4*gp)});
+  for(const cat of Object.keys(CAT_HS)){if(hsKey(cat)!==key)continue;
+    const h=CAT_HS[cat];IMPSC[cat]={};
+    for(const c in sc){const f=h.shared?Math.round(((typeof CAT_FOCUS!=='undefined'&&(CAT_FOCUS[cat]||{})[c])||0)*.6):0;IMPSC[cat][c]=Math.max(5,Math.min(100,sc[c]+f))}}
+}
+function mkScore(cat,c){const r=mkScore0(cat,c);if(!r)return r;const L=(IMPSC[cat]||{})[c];if(L==null)return r;
+  const demand=L,score=Math.round(demand*.45+r.room*.25+r.reg*.15+r.fta*.15-r.risk);return{...r,demand,score,live:true}}
+function exportLive(cat){const h=CAT_HS[cat];if(!h||h.keep)return null;const d=TRADE.exp[h.hs.join(',')];if(!d||!d.rows||d.rows.length<3)return null;
+  d.rows.forEach(o=>{if(!COUNTRY[o.c]&&!KR_EXTRA_C[o.c])KR_EXTRA_C[o.c]=o.name});
+  const base=KR_STATS.byCat[cat]||{},tot=d.total;
+  return{title:`${h.label} 한국 수출 대상국 · ${d.year}년 (실시간)`,unit:'백만$',rows:d.rows.slice(0,5).map(o=>[o.c,+(o.v/1e6).toFixed(1),tot?`한국 수출의 ${(o.v/tot*100).toFixed(1)}%`:'']),
+   src:[['UN Comtrade (HS '+h.hs.join(', ')+')','https://comtradeplus.un.org/'],...(base.src||[]).slice(0,1)],item:base.item,
+   note:`UN Comtrade 연 단위 통계를 서버가 자동으로 불러옵니다(조회일 ${d.asof}). 새 연도가 공개되면 순위가 저절로 바뀝니다.`+(h.shared&&h.shareNote?' '+h.shareNote:'')}}
+function liveStat(){let n=0,t=0,y='';for(const k of Object.keys(CAT_HS))for(const c of MK){t++;if((IMPSC[k]||{})[c]!=null)n++}
+  const any=Object.values(TRADE.imp).find(Boolean);if(any)y=any.year;return{n,t,y}}
+function liveNote(){const el=document.getElementById('mrec'),L=liveStat();
+  const txt=L.n?`수요 지수 실시간 반영: ${L.n}/${L.t}칸이 UN Comtrade ${L.y}년 수입 통계 기준이고, 나머지는 예시 지표입니다. 새 통계가 공개되면 이 순위도 자동으로 바뀝니다.`:`수요 지수는 아직 예시 지표입니다. 서버(/api/trade)에서 무역통계를 받아오면 실제 수입 통계로 바뀝니다.`;
+  if(el){const p=document.createElement('p');p.className='note';p.style.margin='6px 0 0';p.textContent=txt;el.appendChild(p)}
+  const h=document.getElementById('hlive');if(h)h.textContent=L.n?`실제 수입 통계 ${L.n}/${L.t}칸 반영 (UN Comtrade ${L.y}년), 나머지 예시`:'예시 지표'}
+async function loadTrade(onUpdate){
+  if(typeof API_BASE==='undefined'||!API_BASE)return;
+  const keys=[...new Set(Object.values(CAT_HS).map(h=>h.hs.join(',')))],rep=MK.join(',');
+  for(const k of keys){const d=await loadLive('trade?kind=export&hs='+k);if(d&&d.rows){TRADE.exp[k]=d;onUpdate()}}
+  for(const k of keys){const d=await loadLive('trade?kind=import&hs='+k+'&reporters='+rep);if(d&&d.rows){TRADE.imp[k]=d;rebuildImp(k);onUpdate()}}
+}
+function mkScore0(cat,c){const a=MKT_ATTR[c];if(!a)return null;const [size,growth,local,reg,fta]=a;
   let hh=0;for(const ch of cat+c)hh=(hh*31+ch.charCodeAt(0))>>>0;const jit=(hh%13)-6;
   const demand=Math.max(5,Math.min(100,Math.round(size*.6+growth*.4+((CAT_FOCUS[cat]||{})[c]||0)+jit)));
   const supply=Math.min(100,local+((CAT_SUPPLY[cat]||{})[c]||0)),room=100-supply,risk=RISK[c]||0;
@@ -1207,7 +1243,7 @@ def('market','개요','글로벌 시장 동향','품목군별로 수요·공급�
    <div id="mprods" class="hstack" style="margin-top:14px"></div></section>
   <section class="card"><div class="card-h"><div><h2 class="ct">대륙·국가별 시장·규제 뉴스</h2><div class="sub" id="newsMeta"></div></div><select id="ntag" class="mini-select" aria-label="분류"><option>전체</option><option>규제</option><option>인허가</option><option>시장</option><option>수출지원</option></select></div>
    <div class="chips" id="ncont"></div><div class="hstack" id="ncc" style="margin:12px 0 16px"></div><div class="news" id="news"></div><div id="nmore" style="display:flex;justify-content:center;margin-top:16px"></div></section>
-  <section class="card"><div class="card-h"><div><h2 class="ct">대륙별 품목 수요 지수</h2><div class="sub">진할수록 수요가 큽니다 · 선택한 품목군 열이 강조됩니다 (예시 지표)</div></div><div class="chips" id="hcont">${CONT_ORDER.map(c=>`<button class="chip" aria-pressed="${c===hcont}">${c}</button>`).join('')}</div></div><div id="mheat"></div></section>`;
+  <section class="card"><div class="card-h"><div><h2 class="ct">대륙별 품목 수요 지수</h2><div class="sub">진할수록 수요가 큽니다 · 선택한 품목군 열이 강조됩니다 · <span id="hlive">예시 지표</span></div></div><div class="chips" id="hcont">${CONT_ORDER.map(c=>`<button class="chip" aria-pressed="${c===hcont}">${c}</button>`).join('')}</div></div><div id="mheat"></div><details style="margin-top:12px"><summary style="cursor:pointer;font-weight:600;font-size:13px">이 숫자는 무엇을 기준으로 한 건가요?</summary><div class="note" style="margin-top:8px;line-height:1.7">서버가 UN Comtrade(유엔 무역통계)에서 품목군의 대표 HS코드를 <b>나라별 수입액</b>으로 불러옵니다. 수요 지수(0–100) = 수입액 60%(국가 간 로그 눈금) + 전년 대비 수입 증가율 40%입니다. 통계가 연결되지 않았거나 해당 나라 자료가 없는 칸은 예시 지표(시장 규모·성장성을 가정한 값)로 계산하며, 위 제목 옆에 실제 반영 칸 수를 표시합니다. 연 단위 통계라 기준연도는 1~2년 전입니다.</div></details></section>`;
   const cls={규제:'crit',인허가:'warn',시장:'ok',수출지원:'info'};
   const flag=c=>`<span class="code">${c}</span>`;
   function analysis(){
@@ -1218,12 +1254,12 @@ def('market','개요','글로벌 시장 동향','품목군별로 수요·공급�
       <div class="meter" style="margin:6px 0"><span style="width:${r.score}%;background:linear-gradient(90deg,var(--mint),var(--accent))"></span></div>
       <div class="rk-tags"><span>수요 <b>${r.demand}</b></span><span>공급 여유 <b>${r.room}</b></span><span>인허가 <b>${r.reg}</b></span><span>FTA <b>${r.fta}</b></span>${r.risk?`<span class="down">제재·결제 위험</span>`:''}</div></div><span class="rk-v">${r.score}<small>점</small></span></li>`).join('')}</ol>
      <p class="note" style="margin:10px 0 0">점수 = 수요 45% + 공급 여유 25% + 인허가 용이성 15% + FTA 혜택 15%. 국가 지표는 화면 구성을 위한 예시이며, 실제 판단 전 KOTRA·보건산업진흥원 시장 보고서로 확인하세요.</p>`;
-    real();
+    real();liveNote();
     const ps=PRODUCTS.filter(p=>catOf(p)===cat);
     $('#mprods').innerHTML=`<span class="note">이 품목군의 내 제품:</span>`+(ps.length?ps.map(p=>`<a class="chip linkchip" href="#hs" data-hsq="${esc(p.short)}">${esc(p.short)} <span class="mono">${esc(p.hs||'')}</span></a>`).join(''):`<a class="lnk" href="#products">제품 등록하기</a>`);
   }
   function real(){
-    const st=KR_STATS.byCat[cat]||{},useCat=st.rows;
+    const st=exportLive(cat)||KR_STATS.byCat[cat]||{},useCat=st.rows;
     let body='';
     if(rk==='kr'){const s=useCat?st:KR_STATS.overall;const mx=Math.max(...s.rows.map(r=>r[1]||0),1);
       body=`<div class="note" style="margin-bottom:8px">${useCat?`<b>${st.title}</b>`:(st.nocat?`${st.nocat} <b>${KR_STATS.overall.title}</b>`:`${cat} 품목군의 국가별 순위는 공개 통계에서 확인되지 않아 <b>${KR_STATS.overall.title}</b>를 보여 줍니다.`)}</div>
@@ -1265,7 +1301,8 @@ def('market','개요','글로벌 시장 동향','품목군별로 수요·공급�
   $('#ntag').onchange=e=>{tag=e.target.value;news()};
   $('#hcont').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;hcont=b.textContent;store.set('aur-hcont',hcont);heat()};
   analysis();heat();news();
-  loadLive('news').then(d=>{if(d&&d.items&&root.isConnected){data=norm(d);live=true;news()}});
+  loadTrade(()=>{if(root.isConnected){analysis();heat()}});
+  loadLive('news').then(d=>{if(d&&d.items&&root.isConnected){data=norm(d);{const seen=new Set(data.items.map(n=>n.url)),cutoff=fd(addDays(TODAY,-90));const extra=NEWS_SNAPSHOT.items.filter(n=>!seen.has(n.url)&&(!n.date||n.date.length<10||n.date>=cutoff));data={...data,items:[...data.items,...extra]}}live=true;news()}});
 });
 
 /* 3-1. 미국 시장 집중 분석 */
@@ -1773,8 +1810,50 @@ function applyLiveFx(d){ // {date, rates:[{code:'USD',rate:1340.4,history:[...90
     const h=x.history.map(Number);FX[k].s=h;FX[k].labels=Array.isArray(x.dates)&&x.dates.length===h.length?x.dates.map(dd=>String(dd).slice(5).replace('-','.')):h.map((_,i)=>i===h.length-1?'오늘':'');FX[k].live=true});
   return true}
 
+
+/* ── 데이터 갱신 현황: 자동 갱신 항목과 사람이 확인해야 하는 항목을 한곳에서 보여 줍니다 ── */
+function ageDays(s){const t=Date.parse(s);return isNaN(t)?null:Math.floor((Date.now()-t)/864e5)}
+function agePill(a,note){return a==null?pill('plain','확인일 없음'):a<=45?pill('ok',a+'일 전 확인'):a<=120?pill('warn',a+'일 지남 · 재확인'):pill('crit',a+'일 지남 · 갱신 필요')}
+const HEALTH={};
+function freshBoard(root){
+  const el=document.createElement('section');el.className='card';el.id='fresh';
+  const H=k=>HEALTH[k]?(HEALTH[k].ok?pill('ok','정상 · '+HEALTH[k].t):pill('crit','실패 · '+esc(HEALTH[k].e||''))):pill('plain','점검 전');
+  const live=(ok,k)=>ok?pill('ok','연결됨'):(k&&HEALTH[k]&&!HEALTH[k].ok)?pill('crit','실패 · '+esc(HEALTH[k].e||'')):API_BASE?pill('crit','응답 없음'):pill('warn','미연결 · 예시 표시');
+  function draw(){
+    const A=[
+     ['환율','자동','영업일 하루 1회',(LIVE.fx&&FX_SRC)?pill('ok','연결됨 · '+esc(FX_SRC.date||'')):live(false),'수출입은행 키(Vercel 환경변수) · 키가 없으면 ExchangeRate-API로 자동 전환'],
+     ['뉴스','자동','30분 캐시 · 사이트를 열 때마다',live(LIVE.news,'news'),'서버가 Google 뉴스(최근 30일)를 모읍니다. 연결 전에는 저장된 최근 90일 기사를 보여 줍니다'],
+     ['무역통계 (수요 지수·수출 국가 순위·추천 순위)','자동','하루 1회 조회 · 통계는 연 단위',Object.keys(TRADE.imp).length?pill('ok','연결됨 · '+esc((Object.values(TRADE.imp)[0]||{}).year||'')+'년'):live(false,'trade'),'UN Comtrade. 새 연도가 공개되면 순위가 저절로 바뀝니다'],
+     ['FDA 회수 목록','자동','회수 화면을 열 때',H('recall'),'openFDA (키 불필요)'],
+     ['규제·관세·FTA 변경 소식','자동','관련 화면을 열 때',H('regwatch'),'미국 연방관보 + 뉴스. 소식이 뜨면 아래 수동 항목을 확인해 고칩니다']];
+    const M=[
+     ['박람회·컨퍼런스 일정','수동','개최일 확정 시',agePill(ageDays(EXPO_ASOF)),'public/expos.json 의 updates 에 바뀐 날짜만 적으면 됩니다 ('+esc(EXPO_ASOF)+' 확인)'],
+     ['관세율·FTA 협정세율·HS코드','수동','협정·관세 개정 시 (분기 1회 권장)',agePill(ageDays(ASOF)),'규제·관세 변경 소식이 뜨면 공식 자료로 확인한 뒤 수정 ('+esc(ASOF)+' 확인)'],
+     ['인허가 요건·필수 서류·승인 조건','수동','규정 개정 시',agePill(ageDays(ASOF)),'각국 규제기관 공지 확인 후 수정 ('+esc(ASOF)+' 확인)'],
+     ['국가별 시장 규모(고정값)','수동','연 1회',agePill(ageDays('2026-10-09')),'무역통계가 연결되면 수요 지수는 자동 값으로 대체됩니다. 연결 전·자료 없는 칸의 대체값입니다'],
+     ['허가 용이성·현지 공급 점수','예시','—',pill('plain','예시 판단값'),'공개 통계가 없어 자동화할 수 없습니다. 근거 자료가 있으면 교체하세요']];
+    const row=(r)=>`<tr><td><b>${r[0]}</b></td><td>${r[1]==='자동'?pill('info','자동'):r[1]==='수동'?pill('warn','수동'):pill('plain','예시')}</td><td>${r[2]}</td><td>${r[3]}</td><td class="note">${r[4]}</td></tr>`;
+    el.innerHTML=`<div class="card-h"><div><h2 class="ct">데이터 갱신 현황</h2><div class="sub">자동으로 바뀌는 것과, 사람이 확인해 고쳐야 하는 것을 한눈에 봅니다</div></div><button class="btn pri" id="fchk" type="button">${API_BASE?'전체 연결 점검':'점검 불가 (서버 미연결)'}</button></div>
+     <div class="tbl"><table class="data"><thead><tr><th>데이터</th><th>방식</th><th>갱신 시점</th><th>상태</th><th>메모</th></tr></thead><tbody>${A.map(row).join('')}${M.map(row).join('')}</tbody></table></div>
+     <p class="note" style="margin:10px 0 0">'수동'은 기준일이 45일을 넘으면 노란색, 120일을 넘으면 빨간색으로 바뀝니다. 각 화면 아래의 "기준일" 표시도 같은 규칙입니다.</p>`;
+    const b=el.querySelector('#fchk');if(b)b.onclick=check;
+  }
+  async function check(){
+    const b=el.querySelector('#fchk');if(!API_BASE||!b)return;b.disabled=true;b.textContent='점검 중…';
+    const T=[['fx','fx'],['news','news'],['trade','trade?kind=export&hs=3004'],['recall','recall?days=30'],['regwatch','regwatch?topic=fda']];
+    for(const [k,path] of T){
+      try{const r=await fetch(`${API_BASE}/${path}`,{headers:{Accept:'application/json'}});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
+        HEALTH[k]={ok:true,t:new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})};
+        if(k==='fx'&&!LIVE.fx){LIVE.fx=j;applyLiveFx(j)}if(k==='news'&&!LIVE.news)LIVE.news=j;
+      }catch(e){HEALTH[k]={ok:false,e:String(e.message||e).slice(0,60)}}
+      draw();}
+  }
+  draw();
+  const first=root.firstElementChild;if(first&&first.nextSibling)root.insertBefore(el,first.nextSibling);else root.appendChild(el);
+  loadTrade(()=>{if(el.isConnected)draw()});
+}
 /* 21. integrations */
-def('integrations','설정','데이터 연동','환율·뉴스·통관 데이터를 실제 API와 연결하는 구조와, 이 화면이 서버에 기대하는 응답 형식입니다.',root=>{
+def('integrations','설정','데이터 연동','환율·뉴스·통관 데이터를 실제 API와 연결하는 구조와, 이 화면이 서버에 기대하는 응답 형식입니다.',root=>{setTimeout(()=>freshBoard(root),0);
   const SRC=[
    ['환율','한국수출입은행 현재환율 API (권장)','oapi.koreaexim.go.kr/site/program/financial/exchangeJSON?authkey=…&data=AP01','영업일 11시경 1회 갱신 · 일 1,000회','authkey (쿼리)','fx'],
    ['환율 (대체)','ExchangeRate-API 공개 시세','open.er-api.com/v6/latest/KRW','하루 1회 · 과거 추이 없음','없음 (출처 표시 필요)','fxera'],
@@ -2651,7 +2730,7 @@ def('expos','영업 · 채널','글로벌 의료기기 박람회','사이트에 
     const in90=up.filter(o=>o.w.sure&&dleft(o.w.a)<=90&&dleft(o.w.b)>=0).length;
     const now=up.filter(o=>o.w.sure&&dleft(o.w.a)<=0&&dleft(o.w.b)>=0);
     $('#xk').innerHTML=`<div class="kpi"><span class="l">수록 박람회</span><span class="v">${real.length}개</span><span class="d">${new Set(real.map(x=>x.c)).size}개국</span></div><div class="kpi"><span class="l">90일 안에 개막</span><span class="v">${in90}개</span><span class="d">${now.length?'지금 진행 중: '+now.map(o=>o.x.n).join(', '):'진행 중인 행사 없음'}</span></div><div class="kpi"><span class="l">내 품목 관련</span><span class="v">${real.filter(x=>rel(x).length).length}개</span><span class="d">치과·체외진단 등 전문 전시</span></div><div class="kpi"><span class="l">거래 국가 개최</span><span class="v">${real.filter(x=>trade.has(x.c)).length}개</span><span class="d">대리점·인보이스가 있는 나라</span></div>`;
-    $('#xasof').textContent='일정 확인일 '+EXPO_ASOF;
+    $('#xasof').textContent='일정 확인일 '+EXPO_ASOF+(ageDays(EXPO_ASOF)>45?' · '+ageDays(EXPO_ASOF)+'일 지남, 공식 사이트에서 다시 확인하세요':'');
     const need=real.map(x=>({x,w:expoWhen(x)})).filter(o=>!o.w||!o.w.sure);
     $('#xchk').innerHTML=`<div class="card-h"><div><h2 class="ct">일정 확인이 필요한 박람회 ${need.length}곳</h2><div class="sub">다음 회차 날짜가 아직 입력되지 않아 지난 개최 패턴으로 추정한 곳입니다. 주최 측이 발표하면 날짜를 넣어 주세요.</div></div></div>
      <div class="xneed">${need.map(({x,w})=>`<div class="xn1"><div><b>${esc(x.n)}</b> <span class="code">${x.c}</span><div class="note">${w?`${w.a.getFullYear()}년 ${w.a.getMonth()+1}월경 (예상)`:'일정 미확인'} · ${esc(x.cyc||'')}</div></div><a class="btn sm" href="${x.url?esc(x.url):'https://www.google.com/search?q='+encodeURIComponent(x.n+' '+(TODAY.getFullYear()+1)+' dates')}" target="_blank" rel="noopener">${x.url?'공식 사이트':'검색'} ↗</a></div>`).join('')||'<p class="note">모든 박람회의 다음 일정이 확정되어 있습니다.</p>'}</div>
@@ -2743,12 +2822,13 @@ function liveBox(m){
     out.innerHTML=`<p class="note" style="margin:0 0 8px">가져온 시각 ${esc(j.collected)} · 최신순 ${j.items.length}건${b.dataset.t==='fda'?' · 영문 원문':''}</p>`+
     list(j.items,i=>`<a class="lb-item" href="${esc(i.url)}" target="_blank" rel="noopener"><div class="lb-h"><b>${esc(i.title)}</b></div>${i.note?`<div class="lb-r">${esc(i.note)}</div>`:''}<div class="lb-m">${esc(i.date||'')} · ${esc(i.source)}${i.kind&&i.kind!=='기사'?' · '+esc(i.kind):''} ↗</div></a>`)+
     `<p class="note" style="margin:10px 0 0">기사·공고의 제목만 모은 목록입니다. 실제 규정이나 세율은 공식 출처에서 확인한 뒤 반영하세요.</p>`});
+  if(API_BASE)setTimeout(()=>{const b=d.querySelector('#lbGo')||d.querySelector('button[data-t]');if(b)b.click()},60);
   return d;
 }
 function srcFoot(m){
   const s=SRCFOOT[m.id];if(!s)return null;
   const d=document.createElement('div');d.className='srcfoot';
-  d.innerHTML=`<div class="sf-t"><b>기준일 ${ASOF}</b> · 직접 정리한 정보이며 자동으로 갱신되지 않습니다.</div><div class="sf-n">${s[0]}</div>${s[1].length?`<div class="sf-l">${s[1].map(([n,u])=>`<a class="btn sm" href="${u}" target="_blank" rel="noopener">${n} ↗</a>`).join('')}</div>`:''}`;
+  d.innerHTML=`<div class="sf-t"><b>기준일 ${ASOF}</b> · 직접 정리한 정보이며 자동으로 갱신되지 않습니다. ${agePill(ageDays(ASOF))}</div><div class="sf-n">${s[0]}</div>${s[1].length?`<div class="sf-l">${s[1].map(([n,u])=>`<a class="btn sm" href="${u}" target="_blank" rel="noopener">${n} ↗</a>`).join('')}</div>`:''}`;
   return d;
 }
 function route(keep){
