@@ -125,23 +125,37 @@ async function loadExchangeRateApi() {
   return { date, source: 'exchangerate-api', attribution: { text: 'Rates By Exchange Rate API', url: 'https://www.exchangerate-api.com' }, rates };
 }
 
+// 마지막으로 성공한 값(서버가 켜져 있는 동안 유지)과, 한도에 걸렸을 때 잠시 쉬기 위한 표시
+let lastGood = null;
+let blockedUntil = 0;
+
 export default async function handler(req, res) {
   const key = process.env.KOREAEXIM_API_KEY;
   const days = Math.min(Math.max(Number(process.env.FX_DAYS) || 45, 7), 120);
   const provider = (process.env.FX_PROVIDER || (key ? 'koreaexim' : 'exchangerate-api')).toLowerCase();
   let firstError = null;
+  // 한도에 걸린 직후에는 같은 곳을 다시 두드리지 않고(차단이 길어짐), 저장해 둔 마지막 값을 보여 줍니다.
+  if (Date.now() < blockedUntil && lastGood) {
+    return sendJSON(res, 200, { ...lastGood, stale: true, note: '환율 제공처의 호출 한도에 걸려, 마지막으로 받은 값을 보여 드립니다.' }, 300);
+  }
   // 1순위: 수출입은행(키가 있을 때) → 실패하면 2순위: ExchangeRate-API
   if (provider === 'koreaexim' && key) {
     try {
       const data = await cached(`fx:${days}:${kstDate()}`, 12 * 3600e3, () => loadRates(key, days));
+      lastGood = data;
       return sendJSON(res, 200, data, 12 * 3600);
     } catch (e) { firstError = e.message; }
   }
   try {
-    const data = await cached(`fx-era:${kstDate()}`, 6 * 3600e3, loadExchangeRateApi);
+    const data = await cached(`fx-era:${kstDate()}`, 12 * 3600e3, loadExchangeRateApi);
+    lastGood = data;
     if (firstError) data.note = `수출입은행 오류로 대체 출처를 사용했습니다: ${firstError}`;
-    sendJSON(res, 200, data, 6 * 3600);
+    sendJSON(res, 200, data, 12 * 3600);
   } catch (e) {
+    if (/한도/.test(e.message)) blockedUntil = Date.now() + 25 * 60e3;
+    if (lastGood) {
+      return sendJSON(res, 200, { ...lastGood, stale: true, note: `새 값을 받지 못해 마지막으로 받은 값을 보여 드립니다 (${e.message})` }, 300);
+    }
     sendJSON(res, 502, { error: firstError ? `${firstError} / ${e.message}` : e.message });
   }
 }
